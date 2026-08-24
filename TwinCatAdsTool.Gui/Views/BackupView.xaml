@@ -29,7 +29,15 @@
                     >
             </Button>
             
+            <Button Command="{Binding ShowReport}"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Content="Report"
+                    Margin="16"
+                    />
+
             <Label Margin="24,16,0,16" Content="{Binding CurrentTask}"/>
+
+            <Label Margin="8,16,0,16" Content="{Binding LastReportSummary}" FontWeight="Bold"/>
             
 
         </StackPanel>

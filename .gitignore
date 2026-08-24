@@ -328,3 +328,7 @@ ASALocalRun/
 
 # MFractors (Xamarin productivity tool) working folder 
 .mfractor/
+
+# local build output of the added test project
+Tests/TwinCatAdsTool.Logic.Tests/bin/
+Tests/TwinCatAdsTool.Logic.Tests/obj/

@@ -43,6 +43,13 @@
                     Margin="16"
                     Content="{x:Static properties:Resources.Write}"
                     />
+            <Button Command="{Binding ShowReport}"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Margin="16"
+                    Content="Report"
+                    />
+
+            <Label Margin="8,16,0,16" Content="{Binding LastReportSummary}" FontWeight="Bold"/>
 
         </StackPanel>
 

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Reactive.Linq;
 using DynamicData;
 using System.Reactive;
@@ -9,13 +10,12 @@ using System.Reactive.Subjects;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using ReactiveUI;
 using TwinCAT;
-using TwinCAT.JsonExtension;
 using TwinCatAdsTool.Gui.Properties;
 using TwinCatAdsTool.Interfaces.Extensions;
+using TwinCatAdsTool.Interfaces.Models;
 using TwinCatAdsTool.Interfaces.Services;
 using MessageBox = System.Windows.MessageBox;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
@@ -32,6 +32,8 @@ namespace TwinCatAdsTool.Gui.ViewModels
         private ObservableCollection<VariableViewModel> displayVariables;
         private ObservableCollection<VariableViewModel> fileVariables;
         private ObservableCollection<VariableViewModel> liveVariables;
+        private PersistentOperationReport lastReport;
+        private string lastReportSummary;
 
         public RestoreViewModel(IClientService clientService, IPersistentVariableService persistentVariableService)
         {
@@ -82,6 +84,22 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
         public ReactiveCommand<Unit, Unit> Load { get; set; }
         public ReactiveCommand<Unit, Unit> Write { get; set; }
+        public ReactiveCommand<Unit, Unit> ShowReport { get; set; }
+
+        /// <summary>
+        /// Outcome of the last restore. Every persistent variable of the plc is accounted for
+        /// here, including the ones the backup file did not cover.
+        /// </summary>
+        public string LastReportSummary
+        {
+            get => lastReportSummary;
+            set
+            {
+                if (value == lastReportSummary) return;
+                lastReportSummary = value;
+                raisePropertyChanged();
+            }
+        }
 
         public override void Init()
         {
@@ -101,6 +119,9 @@ namespace TwinCatAdsTool.Gui.ViewModels
                 .AddDisposableTo(Disposables);
 
             Write = ReactiveCommand.CreateFromTask(WriteVariables, canWrite.Select(x => x))
+                .AddDisposableTo(Disposables);
+
+            ShowReport = ReactiveCommand.CreateFromTask(ShowLastReport)
                 .AddDisposableTo(Disposables);
         }
 
@@ -167,46 +188,75 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
         private async Task<Unit> WriteVariables()
         {
-            MessageBoxResult messageBoxResult = MessageBox.Show(Resources.AreYouSureYouWantToOverwriteTheLiveVariablesOnThePLC, Resources.OverwriteConfirmation, MessageBoxButton.YesNo);
-            if (messageBoxResult == MessageBoxResult.Yes)
+            var backup = fileVariableSubject.Value;
+
+            if (backup == null || !backup.Properties().Any())
             {
-                foreach (var variable in DisplayVariables)
-                {
-                    var jObject = await JObject.LoadAsync(new JsonTextReader(new StringReader(variable.Json)));
-
-                    foreach (var p in jObject.Properties())
-                    {
-                        try
-                        {
-                            Logger.Debug($"Restoring variable '{variable.Name}.{p.Name}' from backup...");
-                            switch (p.Value)
-                            {
-                                case JObject value:
-                                    await clientService.Client.WriteJson(variable.Name + "." + p.Name, value, force: true);
-                                    break;
-                                case JArray array:
-                                    await clientService.Client.WriteJson(variable.Name + "." + p.Name, array, force: true);
-                                    break;
-                                case JValue:
-                                    await clientService.Client.WriteAsync(variable.Name + "." + p.Name, p.Value);
-                                    break;
-                                default:
-                                    Logger.Error(
-                                        $"Unable to write variable '{variable.Name}.{p.Name} := {p.Value.ToString(Formatting.None)}' from backup: no type case match!");
-                                    break;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Error($"Unable to write variable '{variable.Name}.{p.Name} := {p.Value.ToString(Formatting.None)}' from backup!", ex);
-                            MessageBox.Show($"{variable.Name}.{p.Name} := {p.Value.ToString(Formatting.None)} \n {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                        }
-                    }
-
-                }
+                MessageBox.Show("Load a backup file first.", "Nothing to restore",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return Unit.Default;
             }
 
+            var messageBoxResult = MessageBox.Show(Resources.AreYouSureYouWantToOverwriteTheLiveVariablesOnThePLC,
+                Resources.OverwriteConfirmation, MessageBoxButton.YesNo);
+
+            if (messageBoxResult != MessageBoxResult.Yes)
+            {
+                return Unit.Default;
+            }
+
+            var report = await persistentVariableService.WritePersistentVariables(
+                clientService.Client,
+                clientService.TreeViewSymbols,
+                backup);
+
+            lastReport = report;
+            LastReportSummary = report.Summary;
+            Logger.Debug($"Restore finished - {report.Summary}");
+
+            // Anything that was not written has to reach the user, not just the log file.
+            MessageBox.Show(
+                report.IsComplete
+                    ? $"All persistent variables were restored ({report.Summary})."
+                    : $"{report.Summary}.{Environment.NewLine}{Environment.NewLine}" +
+                      $"{Preview(report)}{Environment.NewLine}{Environment.NewLine}" +
+                      "Use 'Report' for the full list.",
+                report.IsComplete ? "Restore complete" : "Restore incomplete",
+                MessageBoxButton.OK,
+                report.IsComplete ? MessageBoxImage.Information : MessageBoxImage.Warning);
+
             return Unit.Default;
+        }
+
+        private Task<Unit> ShowLastReport()
+        {
+            MessageBox.Show(
+                lastReport == null
+                    ? "Nothing has been restored yet."
+                    : $"{lastReport.Summary}{Environment.NewLine}{Environment.NewLine}{lastReport.Details()}",
+                "Restore report",
+                MessageBoxButton.OK,
+                lastReport == null || lastReport.IsComplete ? MessageBoxImage.Information : MessageBoxImage.Warning);
+
+            return Task.FromResult(Unit.Default);
+        }
+
+        private static string Preview(PersistentOperationReport report)
+        {
+            const int maxLines = 10;
+            var lines = report.Results
+                .Where(r => r.State != VariableOperationState.Succeeded)
+                .Take(maxLines)
+                .Select(r => r.ToString())
+                .ToList();
+
+            var remaining = report.FailedCount + report.SkippedCount - lines.Count;
+            if (remaining > 0)
+            {
+                lines.Add($"... and {remaining} more");
+            }
+
+            return string.Join(Environment.NewLine, lines);
         }
     }
 }
