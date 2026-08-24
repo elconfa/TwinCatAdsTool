@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Globalization;
-using System.Linq;
 using System.Windows;
 using System.Windows.Data;
+using MaterialDesignThemes.Wpf;
 using TwinCAT;
 
 namespace TwinCatAdsTool.Gui.Converters
@@ -11,26 +11,23 @@ namespace TwinCatAdsTool.Gui.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is ConnectionState)
+            if (value is ConnectionState connectionState)
             {
-                var connectionState = (ConnectionState)value;
                 switch (connectionState)
                 {
                     case ConnectionState.None:
                     case ConnectionState.Lost:
-                        return "minus";
+                        return PackIconKind.Minus;
                     case ConnectionState.Disconnected:
-                        return "unlink";
+                        return PackIconKind.LinkOff;
                     case ConnectionState.Connected:
-                        return "link";
+                        return PackIconKind.Link;
                     default:
                         return DependencyProperty.UnsetValue;
-
                 }
             }
 
             return DependencyProperty.UnsetValue;
-
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

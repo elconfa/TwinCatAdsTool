@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:fa="http://schemas.fontawesome.io/icons/"
              xmlns:converters="clr-namespace:TwinCatAdsTool.Gui.Converters"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:properties="clr-namespace:TwinCatAdsTool.Gui.Properties"
@@ -66,9 +65,9 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <fa:ImageAwesome Grid.Column="0"
-                                 Icon="{Binding ConnectionState, Converter={StaticResource ConnectionStateToIconConverter}}"
-                                 Width="20" HorizontalAlignment="Left" />
+                <materialDesign:PackIcon Grid.Column="0"
+                                         Kind="{Binding ConnectionState, Converter={StaticResource ConnectionStateToIconConverter}}"
+                                         Width="20" Height="20" HorizontalAlignment="Left" />
                 <Label Grid.Column="1" Content="{Binding AdsStatus}" />
             </Grid>
         </StackPanel>

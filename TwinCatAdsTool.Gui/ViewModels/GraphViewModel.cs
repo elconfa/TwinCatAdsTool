@@ -9,6 +9,7 @@ using System.Reactive.Disposables;
 using System.Threading.Tasks;
 using OxyPlot;
 using OxyPlot.Axes;
+using OxyPlot.Legends;
 using OxyPlot.Series;
 using ReactiveUI;
 using TwinCatAdsTool.Interfaces.Extensions;
@@ -81,13 +82,18 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
         private static PlotModel CreateDefaultPlotModel()
         {
-            return new PlotModel
+            // OxyPlot 2 moved the legend settings off the plot model into its Legends collection.
+            var plotModel = new PlotModel();
+
+            plotModel.Legends.Add(new Legend
             {
                 LegendBorder = OxyColor.FromRgb(0x80, 0x80, 0x80),
                 LegendBorderThickness = 1,
                 LegendBackground = OxyColor.FromRgb(0xFF, 0xFF, 0xFF),
                 LegendPosition = LegendPosition.LeftBottom
-            };
+            });
+
+            return plotModel;
         }
 
         public void RemoveSymbol(SymbolObservationViewModel symbol)

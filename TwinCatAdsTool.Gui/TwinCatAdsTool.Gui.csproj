@@ -14,13 +14,12 @@
     <Resource Include="Resources\evopro.png" />
     <PackageReference Include="Beckhoff.TwinCAT.Ads.Reactive" Version="5.0.379" />
     <PackageReference Include="DiffPlex" Version="1.9.0" />
-    <PackageReference Include="Extended.Wpf.Toolkit" Version="3.6.0" />
-    <PackageReference Include="FontAwesome.WPF" Version="4.7.0.9" />
+    <PackageReference Include="Extended.Wpf.Toolkit" Version="5.1.2" />
     <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
-    <PackageReference Include="MahApps.Metro" Version="2.2.0" />
+    <PackageReference Include="MahApps.Metro" Version="2.4.11" />
     <PackageReference Include="MaterialDesignExtensions" Version="3.2.0" />
     <PackageReference Include="MaterialDesignThemes.MahApps" Version="0.1.4" />
-    <PackageReference Include="OxyPlot.Wpf" Version="1.0.0" />
+    <PackageReference Include="OxyPlot.Wpf" Version="2.2.0" />
     <PackageReference Include="ReactiveUI" Version="24.1.0" />
     <PackageReference Include="ReactiveUI.WPF" Version="24.1.0" />
     <ProjectReference Include="..\TwinCatAdsTool.Interfaces\TwinCatAdsTool.Interfaces.csproj" />
