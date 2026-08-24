@@ -23,7 +23,14 @@ namespace TwinCatAdsTool.Logic.Values
 
         private DynamicValue Dynamic => value as DynamicValue;
 
-        public bool IsArray => Dynamic?.DataType?.Category == DataTypeCategory.Array;
+        /// <summary>
+        /// An array of a primitive plc type comes back as a plain managed array - bool[] for an
+        /// ARRAY OF BOOL, byte[] for an ARRAY OF BYTE - rather than as a DynamicValue. Treating
+        /// one of those as a leaf would hand a whole array to JValue, which cannot type it.
+        /// </summary>
+        private Array NativeArray => value as Array;
+
+        public bool IsArray => Dynamic?.DataType?.Category == DataTypeCategory.Array || NativeArray != null;
 
         public bool IsStruct
         {
@@ -43,6 +50,12 @@ namespace TwinCatAdsTool.Logic.Values
         {
             get
             {
+                var native = NativeArray;
+                if (native != null)
+                {
+                    return native.Cast<object>().Select(element => (IPlcValueNode) new DynamicValueNode(element));
+                }
+
                 if (!IsArray || !Dynamic.TryGetArrayElementValues(out var elements))
                 {
                     return Enumerable.Empty<IPlcValueNode>();
@@ -63,12 +76,32 @@ namespace TwinCatAdsTool.Logic.Values
         {
             get
             {
+                var native = NativeArray;
+                if (native != null)
+                {
+                    // A managed array is indexed from its own lower bound, not from the one the
+                    // plc declares; both ends of the conversion agree on it, which is what counts.
+                    return native.Rank == 1 ? native.GetLowerBound(0) : 0;
+                }
+
                 var dimensions = (Dynamic?.DataType as IArrayType)?.Dimensions;
                 return dimensions?.LowerBounds?.FirstOrDefault() ?? 0;
             }
         }
 
-        public int ArrayLength => (Dynamic?.DataType as IArrayType)?.Dimensions?.ElementCount ?? 0;
+        public int ArrayLength
+        {
+            get
+            {
+                var native = NativeArray;
+                if (native != null)
+                {
+                    return native.Length;
+                }
+
+                return (Dynamic?.DataType as IArrayType)?.Dimensions?.ElementCount ?? 0;
+            }
+        }
 
         public bool TryGetMember(string name, out IPlcValueNode member)
         {
@@ -95,6 +128,21 @@ namespace TwinCatAdsTool.Logic.Values
         {
             element = null;
 
+            var native = NativeArray;
+            if (native != null)
+            {
+                try
+                {
+                    element = new DynamicValueNode(native.GetValue(index));
+                    return true;
+                }
+                catch (Exception)
+                {
+                    // Out of range, or an array of more than one dimension.
+                    return false;
+                }
+            }
+
             var dynamicValue = Dynamic;
             if (dynamicValue == null || !dynamicValue.TryGetIndexValue(new[] {index}, out var elementValue))
             {
@@ -119,6 +167,26 @@ namespace TwinCatAdsTool.Logic.Values
 
         public bool TrySetElement(int index, object newValue)
         {
+            var native = NativeArray;
+            if (native != null)
+            {
+                try
+                {
+                    var element = native.GetValue(index);
+                    if (!ValueCoercion.TryCoerce(newValue, ValueCoercion.Normalize(element), out var converted))
+                    {
+                        return false;
+                    }
+
+                    native.SetValue(Denormalize(converted, element), index);
+                    return true;
+                }
+                catch (Exception)
+                {
+                    return false;
+                }
+            }
+
             var dynamicValue = Dynamic;
             if (dynamicValue == null || !dynamicValue.TryGetIndexValue(new[] {index}, out var current))
             {

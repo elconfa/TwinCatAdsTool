@@ -60,7 +60,29 @@ namespace TwinCatAdsTool.Logic.Values
                 return obj;
             }
 
-            return node.Value == null ? JValue.CreateNull() : new JValue(node.Value);
+            return ToJsonValue(node.Value);
+        }
+
+        /// <summary>
+        /// JValue only knows the primitive types. Anything else the ads library hands back -
+        /// a collection, a wrapper type - goes through the general converter rather than failing
+        /// and taking the whole variable out of the backup.
+        /// </summary>
+        private static JToken ToJsonValue(object value)
+        {
+            if (value == null)
+            {
+                return JValue.CreateNull();
+            }
+
+            try
+            {
+                return new JValue(value);
+            }
+            catch (ArgumentException)
+            {
+                return JToken.FromObject(value);
+            }
         }
 
         /// <summary>
