@@ -332,3 +332,6 @@ ASALocalRun/
 # local build output of the added test project
 Tests/TwinCatAdsTool.Logic.Tests/bin/
 Tests/TwinCatAdsTool.Logic.Tests/obj/
+
+# local publish output
+publish/
