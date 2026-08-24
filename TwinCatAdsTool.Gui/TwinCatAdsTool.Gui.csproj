@@ -10,18 +10,19 @@
 
   <ItemGroup>
     <None Remove="Resources\evopro.png" />
+    <PackageReference Include="DynamicData" Version="9.4.33" />
     <Resource Include="Resources\evopro.png" />
-    <PackageReference Include="Beckhoff.TwinCAT.Ads.Reactive" Version="5.0.327" />
-    <PackageReference Include="DiffPlex" Version="1.4.4" />
+    <PackageReference Include="Beckhoff.TwinCAT.Ads.Reactive" Version="5.0.379" />
+    <PackageReference Include="DiffPlex" Version="1.9.0" />
     <PackageReference Include="Extended.Wpf.Toolkit" Version="3.6.0" />
     <PackageReference Include="FontAwesome.WPF" Version="4.7.0.9" />
-    <PackageReference Include="JetBrains.Annotations" Version="2020.3.0" />
+    <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
     <PackageReference Include="MahApps.Metro" Version="2.2.0" />
     <PackageReference Include="MaterialDesignExtensions" Version="3.2.0" />
     <PackageReference Include="MaterialDesignThemes.MahApps" Version="0.1.4" />
     <PackageReference Include="OxyPlot.Wpf" Version="1.0.0" />
-    <PackageReference Include="ReactiveUI" Version="9.11.1" />
-    <PackageReference Include="ReactiveUI.WPF" Version="9.11.1" />
+    <PackageReference Include="ReactiveUI" Version="24.1.0" />
+    <PackageReference Include="ReactiveUI.WPF" Version="24.1.0" />
     <ProjectReference Include="..\TwinCatAdsTool.Interfaces\TwinCatAdsTool.Interfaces.csproj" />
     <None Remove="Resources\twincat.png" />
     <Resource Include="Resources\twincat.png" />

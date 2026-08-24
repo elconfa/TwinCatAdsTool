@@ -12,6 +12,7 @@ using System.Windows;
 using System.Windows.Forms;
 using Newtonsoft.Json.Linq;
 using ReactiveUI;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 using TwinCAT;
 using TwinCatAdsTool.Gui.Properties;
 using TwinCatAdsTool.Interfaces.Extensions;
@@ -82,9 +83,9 @@ namespace TwinCatAdsTool.Gui.ViewModels
             }
         }
 
-        public ReactiveCommand<Unit, Unit> Load { get; set; }
-        public ReactiveCommand<Unit, Unit> Write { get; set; }
-        public ReactiveCommand<Unit, Unit> ShowReport { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> Load { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> Write { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> ShowReport { get; set; }
 
         /// <summary>
         /// Outcome of the last restore. Every persistent variable of the plc is accounted for
@@ -147,14 +148,14 @@ namespace TwinCatAdsTool.Gui.ViewModels
         }
 
 
-        private async Task<Unit> LoadVariables()
+        private async Task<RxVoid> LoadVariables()
         {
             await LoadVariablesFromFile();
 
-            return Unit.Default;
+            return RxVoid.Default;
         }
 
-        private Task<Unit> LoadVariablesFromFile()
+        private Task<RxVoid> LoadVariablesFromFile()
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
             openFileDialog.Filter = "Json files (*.json)|*.json";
@@ -166,7 +167,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
                 canWrite.OnNext(true);
             }
 
-            return Task.FromResult(Unit.Default);
+            return Task.FromResult(RxVoid.Default);
         }
 
         private void UpdateDisplayIfMatching()
@@ -186,7 +187,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
             Logger.Debug(Resources.UpdatedRestoreView);
         }
 
-        private async Task<Unit> WriteVariables()
+        private async Task<RxVoid> WriteVariables()
         {
             var backup = fileVariableSubject.Value;
 
@@ -194,7 +195,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
             {
                 MessageBox.Show("Load a backup file first.", "Nothing to restore",
                     MessageBoxButton.OK, MessageBoxImage.Information);
-                return Unit.Default;
+                return RxVoid.Default;
             }
 
             var messageBoxResult = MessageBox.Show(Resources.AreYouSureYouWantToOverwriteTheLiveVariablesOnThePLC,
@@ -202,7 +203,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
             if (messageBoxResult != MessageBoxResult.Yes)
             {
-                return Unit.Default;
+                return RxVoid.Default;
             }
 
             var report = await persistentVariableService.WritePersistentVariables(
@@ -225,10 +226,10 @@ namespace TwinCatAdsTool.Gui.ViewModels
                 MessageBoxButton.OK,
                 report.IsComplete ? MessageBoxImage.Information : MessageBoxImage.Warning);
 
-            return Unit.Default;
+            return RxVoid.Default;
         }
 
-        private Task<Unit> ShowLastReport()
+        private Task<RxVoid> ShowLastReport()
         {
             MessageBox.Show(
                 lastReport == null
@@ -238,7 +239,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
                 MessageBoxButton.OK,
                 lastReport == null || lastReport.IsComplete ? MessageBoxImage.Information : MessageBoxImage.Warning);
 
-            return Task.FromResult(Unit.Default);
+            return Task.FromResult(RxVoid.Default);
         }
 
         private static string Preview(PersistentOperationReport report)

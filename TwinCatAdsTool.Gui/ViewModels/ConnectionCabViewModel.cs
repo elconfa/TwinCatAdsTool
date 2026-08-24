@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using ReactiveUI;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 using TwinCAT;
 using TwinCAT.Ads;
 using TwinCatAdsTool.Gui.Extensions;
@@ -35,10 +36,10 @@ namespace TwinCatAdsTool.Gui.ViewModels
         }
 
         public ObservableCollection<NetId> AmsNetIds { get; set; } = new ObservableCollection<NetId>();
-        public ReactiveCommand<Unit, Unit> Connect { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> Connect { get; set; }
 
         public ConnectionState ConnectionState => connectionStateHelper.Value;
-        public ReactiveCommand<Unit, Unit> Disconnect { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> Disconnect { get; set; }
 
         public int Port
         {

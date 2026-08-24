@@ -6,8 +6,8 @@
 
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.3.0" />
-    <PackageReference Include="Ninject" Version="3.3.4" />
-    <PackageReference Include="System.Reactive" Version="5.0.0" />
+    <PackageReference Include="Ninject" Version="3.3.6" />
+    <PackageReference Include="System.Reactive" Version="6.0.1" />
     <!-- Both used to arrive transitively through TwinCAT.JsonExtension, which the rewritten
          backup and restore no longer needs. -->
     <PackageReference Include="Beckhoff.TwinCAT.Ads" Version="5.0.379" />

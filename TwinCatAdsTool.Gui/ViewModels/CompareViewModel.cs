@@ -14,6 +14,7 @@ using DiffPlex.DiffBuilder.Model;
 using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
 using ReactiveUI;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 using TwinCAT;
 using TwinCatAdsTool.Gui.Properties;
 using TwinCatAdsTool.Interfaces.Extensions;
@@ -107,10 +108,10 @@ namespace TwinCatAdsTool.Gui.ViewModels
             }
         }
 
-        public ReactiveCommand<Unit, Unit> LoadLeft { get; set; }
-        public ReactiveCommand<Unit, Unit> LoadRight { get; set; }
-        public ReactiveCommand<Unit, Unit> ReadLeft { get; set; }
-        public ReactiveCommand<Unit, Unit> ReadRight { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> LoadLeft { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> LoadRight { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> ReadLeft { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> ReadRight { get; set; }
         public IEnumerable<ListBoxItem> RightBoxText
         {
             get
@@ -252,7 +253,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
                 Logger.Debug(Resources.UpdatedLeftTextBox);
             }
 
-            return Task.FromResult(Unit.Default);
+            return Task.FromResult(RxVoid.Default);
         }
 
         private Task LoadJsonRight()
@@ -266,7 +267,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
             }
 
 
-            return Task.FromResult(Unit.Default);
+            return Task.FromResult(RxVoid.Default);
         }
 
         private async Task<JObject> ReadVariables()

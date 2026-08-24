@@ -10,6 +10,7 @@ using System.Windows.Forms;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using ReactiveUI;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 using TwinCAT;
 using TwinCatAdsTool.Gui.Properties;
 using TwinCatAdsTool.Interfaces.Extensions;
@@ -61,9 +62,9 @@ namespace TwinCatAdsTool.Gui.ViewModels
             }
         }
 
-        public ReactiveCommand<Unit, Unit> Read { get; set; }
-        public ReactiveCommand<Unit, Unit> Save { get; set; }
-        public ReactiveCommand<Unit, Unit> ShowReport { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> Read { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> Save { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> ShowReport { get; set; }
 
         public override void Init()
         {
@@ -89,7 +90,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
         public string CurrentTask => currentTaskHelper.Value;
 
-        private async Task<Unit> ReadVariables()
+        private async Task<RxVoid> ReadVariables()
         {
             var backup = await persistentVariableService.ReadPersistentVariables(
                 clientService.Client,
@@ -113,10 +114,10 @@ namespace TwinCatAdsTool.Gui.ViewModels
                     MessageBoxImage.Warning);
             }
 
-            return Unit.Default;
+            return RxVoid.Default;
         }
 
-        private Task<Unit> ShowLastReport()
+        private Task<RxVoid> ShowLastReport()
         {
             MessageBox.Show(
                 lastReport == null
@@ -126,7 +127,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
                 MessageBoxButton.OK,
                 lastReport == null || lastReport.IsComplete ? MessageBoxImage.Information : MessageBoxImage.Warning);
 
-            return Task.FromResult(Unit.Default);
+            return Task.FromResult(RxVoid.Default);
         }
 
         private static string Preview(PersistentOperationReport report)
@@ -147,13 +148,13 @@ namespace TwinCatAdsTool.Gui.ViewModels
             return string.Join(Environment.NewLine, lines);
         }
 
-        private Task<Unit> SaveVariables()
+        private Task<RxVoid> SaveVariables()
         {
             if (string.IsNullOrEmpty(BackupText))
             {
                 MessageBox.Show("There is nothing to save yet - read the variables first.", "Nothing to save",
                     MessageBoxButton.OK, MessageBoxImage.Information);
-                return Task.FromResult(Unit.Default);
+                return Task.FromResult(RxVoid.Default);
             }
 
             if (lastReport != null && !lastReport.IsComplete)
@@ -168,7 +169,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
                 if (proceed != MessageBoxResult.Yes)
                 {
-                    return Task.FromResult(Unit.Default);
+                    return Task.FromResult(RxVoid.Default);
                 }
             }
 
@@ -184,7 +185,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
                 Logger.Debug(string.Format(Resources.SavedBackupTo0Logging, saveFileDialog1.FileName));
             }
 
-            return Task.FromResult(Unit.Default);
+            return Task.FromResult(RxVoid.Default);
         }
     }
 }

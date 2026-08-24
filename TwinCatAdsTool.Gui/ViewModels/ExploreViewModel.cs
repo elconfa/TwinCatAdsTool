@@ -10,6 +10,7 @@ using System.Reactive.Subjects;
 using System.Threading.Tasks;
 using System.Windows;
 using ReactiveUI;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 using TwinCAT;
 using TwinCAT.Ads.TypeSystem;
 using TwinCAT.TypeSystem;
@@ -47,12 +48,12 @@ namespace TwinCatAdsTool.Gui.ViewModels
             this.symbolSelection = symbolSelection;
         }
 
-        public ReactiveCommand<ISymbol, Unit> AddObserverCmd { get; set; }
+        public ReactiveCommand<ISymbol, RxVoid> AddObserverCmd { get; set; }
 
-        public ReactiveCommand<SymbolObservationViewModel, Unit> CmdAddGraph { get; set; }
-        public ReactiveCommand<SymbolObservationViewModel, Unit> CmdDelete { get; set; }
+        public ReactiveCommand<SymbolObservationViewModel, RxVoid> CmdAddGraph { get; set; }
+        public ReactiveCommand<SymbolObservationViewModel, RxVoid> CmdDelete { get; set; }
 
-        public ReactiveCommand<SymbolObservationViewModel, Unit> CmdRemoveGraph { get; set; }
+        public ReactiveCommand<SymbolObservationViewModel, RxVoid> CmdRemoveGraph { get; set; }
 
         public GraphViewModel GraphViewModel { get; set; }
 
@@ -84,7 +85,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
         public ObserverViewModel ObserverViewModel { get; set; }
 
-        public ReactiveCommand<Unit, Unit> Read { get; set; }
+        public ReactiveCommand<RxVoid, RxVoid> Read { get; set; }
 
         public ObservableCollection<ISymbol> SearchResults { get; } = new ObservableCollection<ISymbol>();
 
@@ -206,29 +207,29 @@ namespace TwinCatAdsTool.Gui.ViewModels
 // Setup the command for the enter key on the textbox
             TextBoxEnterCommand = new ReactiveRelayCommand(obj => { });
 
-            AddObserverCmd = ReactiveCommand.CreateFromTask<ISymbol, Unit>(RegisterSymbolObserver, canExecute: connected)
+            AddObserverCmd = ReactiveCommand.CreateFromTask<ISymbol, RxVoid>(RegisterSymbolObserver, canExecute: connected)
                 .AddDisposableTo(Disposables);
 
-            CmdDelete = ReactiveCommand.CreateFromTask<SymbolObservationViewModel, Unit>(DeleteSymbolObserver)
+            CmdDelete = ReactiveCommand.CreateFromTask<SymbolObservationViewModel, RxVoid>(DeleteSymbolObserver)
                 .AddDisposableTo(Disposables);
 
-            CmdAddGraph = ReactiveCommand.CreateFromTask<SymbolObservationViewModel, Unit>(AddGraph)
+            CmdAddGraph = ReactiveCommand.CreateFromTask<SymbolObservationViewModel, RxVoid>(AddGraph)
                 .AddDisposableTo(Disposables);
 
-            CmdRemoveGraph = ReactiveCommand.CreateFromTask<SymbolObservationViewModel, Unit>(RemoveGraph)
+            CmdRemoveGraph = ReactiveCommand.CreateFromTask<SymbolObservationViewModel, RxVoid>(RemoveGraph)
                 .AddDisposableTo(Disposables);
 
             Read = ReactiveCommand.CreateFromTask(ReadVariables, canExecute: connected)
                 .AddDisposableTo(Disposables);
         }
 
-        private Task<Unit> AddGraph(SymbolObservationViewModel symbolObservationViewModel)
+        private Task<RxVoid> AddGraph(SymbolObservationViewModel symbolObservationViewModel)
         {
             GraphViewModel.AddSymbol(symbolObservationViewModel);
-            return Task.FromResult(Unit.Default);
+            return Task.FromResult(RxVoid.Default);
         }
 
-        private Task<Unit> DeleteSymbolObserver(SymbolObservationViewModel model)
+        private Task<RxVoid> DeleteSymbolObserver(SymbolObservationViewModel model)
         {
             try
             {
@@ -241,7 +242,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
                 MessageBox.Show(ex.Message, ex.GetType().ToString(), MessageBoxButton.OK);
             }
 
-            return Task.FromResult(Unit.Default);
+            return Task.FromResult(RxVoid.Default);
         }
 
         private SearchResult DoSearch(string searchTerm)
@@ -261,7 +262,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
             return searchResult;
         }
 
-        private async Task<Unit> ReadVariables()
+        private async Task<RxVoid> ReadVariables()
         {
             try
             {
@@ -273,22 +274,22 @@ namespace TwinCatAdsTool.Gui.ViewModels
                 MessageBox.Show(ex.Message, ex.GetType().ToString(), MessageBoxButton.OK);
             }
 
-            return Unit.Default;
+            return RxVoid.Default;
         }
 
 
-        private Task<Unit> RegisterSymbolObserver(ISymbol symbol)
+        private Task<RxVoid> RegisterSymbolObserver(ISymbol symbol)
         {
             try
             {
                 if (symbol.SubSymbols.Any())
                 {
-                    return Task.FromResult(Unit.Default);
+                    return Task.FromResult(RxVoid.Default);
                 }
 
                 if (symbol.DataType.IsContainer)
                 {
-                    return Task.FromResult(Unit.Default);
+                    return Task.FromResult(RxVoid.Default);
                 }
 
                 symbolSelection.Select(symbol);
@@ -299,13 +300,13 @@ namespace TwinCatAdsTool.Gui.ViewModels
                 MessageBox.Show(ex.Message, ex.GetType().ToString(), MessageBoxButton.OK);
             }
 
-            return Task.FromResult(Unit.Default);
+            return Task.FromResult(RxVoid.Default);
         }
 
-        private Task<Unit> RemoveGraph(SymbolObservationViewModel symbolObservationViewModel)
+        private Task<RxVoid> RemoveGraph(SymbolObservationViewModel symbolObservationViewModel)
         {
             GraphViewModel.RemoveSymbol(symbolObservationViewModel);
-            return Task.FromResult(Unit.Default);
+            return Task.FromResult(RxVoid.Default);
         }
 
         private void UpdateTree(ISymbolCollection<ISymbol> symbolList)

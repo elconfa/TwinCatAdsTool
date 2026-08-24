@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using ReactiveUI;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 using TwinCAT;
 using TwinCAT.Ads.Reactive;
 using TwinCAT.TypeSystem;
@@ -28,7 +29,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
             Model = model;
         }
 
-        public ReactiveCommand<Unit, Unit> CmdSubmit { get; private set; }
+        public ReactiveCommand<RxVoid, RxVoid> CmdSubmit { get; private set; }
         public ISymbol Model { get; set; }
         public string Name { get; set; }
         public string FullName { get; set; }
@@ -139,7 +140,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
         protected override Task SubmitSymbol()
         {
             Write(NewValue);
-            return Task.FromResult(Unit.Default);
+            return Task.FromResult(RxVoid.Default);
         }
 
         private void Write(T value)
