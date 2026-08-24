@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reactive;
 using System.Reactive.Subjects;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using DiffPlex;
@@ -272,10 +273,25 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
         private async Task<JObject> ReadVariables()
         {
-            var persistentVariables = await persistentVariableService.ReadGlobalPersistentVariables(clientService.Client, clientService.TreeViewSymbols);
+            var backup = await persistentVariableService.ReadPersistentVariables(
+                clientService.Client,
+                clientService.TreeViewSymbols);
 
-            Logger.Debug(Resources.ReadPersistentVariables);
-            return persistentVariables;
+            Logger.Debug($"{Resources.ReadPersistentVariables} - {backup.Report.Summary}");
+
+            // Comparing against a partial read would show differences that are not real.
+            if (!backup.Report.IsComplete)
+            {
+                MessageBox.Show(
+                    $"{backup.Report.Summary}.{Environment.NewLine}{Environment.NewLine}" +
+                    "Variables that could not be read are missing from this side of the " +
+                    "comparison and will show up as differences.",
+                    "Incomplete read",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+
+            return backup.Data;
         }
 
         private async Task ReadVariablesLeft()
