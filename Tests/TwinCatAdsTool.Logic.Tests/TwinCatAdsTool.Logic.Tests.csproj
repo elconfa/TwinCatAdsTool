@@ -1,9 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- The test project runs on the sdk installed on the developer machine; the app itself
-         still targets net5.0. Only the tested code has to be net5.0 compatible. -->
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Allows the tests to run on a machine that only has a newer runtime installed. -->
+    <RollForward>LatestMajor</RollForward>
     <IsPackable>false</IsPackable>
     <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>

@@ -1,0 +1,10 @@
+<Project>
+
+  <!-- Lets the wpf projects be compile checked on macos and linux. Building for windows from a
+       non windows host needs the windows targeting pack, which ships as a nuget package from
+       .net 6 onwards. Running the application still requires windows. -->
+  <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+</Project>
