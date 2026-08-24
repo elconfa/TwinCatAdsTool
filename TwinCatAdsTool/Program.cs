@@ -1,11 +1,13 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using log4net;
 using Ninject;
+using ReactiveUI.Builder;
 using TwinCatAdsTool.Gui;
 using TwinCatAdsTool.Gui.ViewModels;
 using TwinCatAdsTool.Gui.Views;
@@ -36,6 +38,7 @@ namespace TwinCatAdsTool
 				try
 				{
 					CreateLogger();
+					InitializeReactiveUI();
 					Log("Application starts!", string.Join("", Enumerable.Repeat("#", 80)));
 					Log("Loading kernel modules... ");
 					LoadModules(kernel);
@@ -61,6 +64,32 @@ namespace TwinCatAdsTool
 					throw;
 				}
 			}
+		}
+
+		/// <summary>
+		/// ReactiveUI 24 no longer registers itself on first use: without this the first
+		/// WhenAnyValue throws a TypeInitializationException and the window never opens.
+		/// Has to run before anything touches ReactiveUI.
+		/// </summary>
+		private static void InitializeReactiveUI()
+		{
+			// The wpf registrations - the dispatcher scheduler among them - live in
+			// ReactiveUI.Wpf. Nothing in this application references a type from that assembly,
+			// so the runtime would never load it and the builder would find no platform to
+			// register. Pull it in first.
+			try
+			{
+				Assembly.Load("ReactiveUI.Wpf");
+			}
+			catch (Exception e)
+			{
+				Log($"Could not preload ReactiveUI.Wpf: {e.Message}");
+			}
+
+			RxAppBuilder
+				.CreateReactiveUIBuilder()
+				.WithPlatformServices()
+				.Build();
 		}
 
 		/// <summary>
