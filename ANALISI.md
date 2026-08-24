@@ -6,8 +6,13 @@ Commit analizzato: `03ab6c7` (2026-04-17, master) — clonato con `--depth=1`
 Data analisi: 2026-08-24
 
 > **Stato:** questo documento fotografa il repository **come clonato da upstream**.
-> Il branch `fix/persistent-performance-reporting` ha gia corretto i punti 4, 7 e 8 del
-> capitolo 6 e riscritto il motore di backup/restore. Vedi `docs/FIX-PERSISTENT.md`.
+> Da allora:
+> - `fix/persistent-performance-reporting` ha riscritto il motore di backup/restore e corretto
+>   i punti 4, 7 e 8 del capitolo 6 — vedi `docs/FIX-PERSISTENT.md`;
+> - `upgrade/net8-modern-ui` ha risolto i punti 1 e 2 (.NET 8, test in CI) e parte del 9 —
+>   vedi `docs/UPGRADE-NET8.md`.
+> Restano aperti i punti 3 (design-time `ViewModelLocator`), 5 (`Encoding.Default`),
+> 6 (`ReadState` sincrono ogni secondo) e 9 (binding sparsi).
 
 ---
 

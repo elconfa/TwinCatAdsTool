@@ -1,4 +1,4 @@
-name: .NET Core Build
+name: .NET Build
 
 on:
   push:
@@ -14,11 +14,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Setup .NET Core
-      uses: actions/setup-dotnet@v1
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 5.0.x
+        dotnet-version: 8.0.x
     - name: Install dependencies
       run: dotnet restore
     - name: Build
@@ -26,21 +26,21 @@ jobs:
     - name: Test
       run: dotnet test --no-restore --verbosity normal
     - name: Publish
-      run: dotnet publish TwinCatAdsTool\TwinCatAdsTool.csproj -c Release /p:AssemblyVersion=1.2.${{ github.run_number }} /p:FileVersion=1.2.${{ github.run_number }} -o out
+      run: dotnet publish TwinCatAdsTool\TwinCatAdsTool.csproj -c Release /p:AssemblyVersion=1.3.${{ github.run_number }} /p:FileVersion=1.3.${{ github.run_number }} -o out
     - name: Compress
-      run: Compress-Archive out\TwinCatAdsTool.exe TwinCatAdsTool_v1.2.${{ github.run_number }}.zip
+      run: Compress-Archive out\TwinCatAdsTool.exe TwinCatAdsTool_v1.3.${{ github.run_number }}.zip
     - name: Publish ReadyToRun
-      run: dotnet publish TwinCatAdsTool\TwinCatAdsTool.csproj -c Release /p:AssemblyVersion=1.2.${{ github.run_number }} /p:FileVersion=1.2.${{ github.run_number }} /p:SelfContained=true /p:PublishReadyToRun=true -o out
+      run: dotnet publish TwinCatAdsTool\TwinCatAdsTool.csproj -c Release /p:AssemblyVersion=1.3.${{ github.run_number }} /p:FileVersion=1.3.${{ github.run_number }} /p:SelfContained=true /p:PublishReadyToRun=true -o out
     - name: Compress ReadyToRun
-      run: Compress-Archive out\TwinCatAdsTool.exe TwinCatAdsTool_ReadyToRun_v1.2.${{ github.run_number }}.zip
+      run: Compress-Archive out\TwinCatAdsTool.exe TwinCatAdsTool_ReadyToRun_v1.3.${{ github.run_number }}.zip
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: 1.2.${{ github.run_number }}
-        release_name: 1.2.${{ github.run_number }}
+        tag_name: 1.3.${{ github.run_number }}
+        release_name: 1.3.${{ github.run_number }}
         draft: false
         prerelease: true
     - name: Upload
@@ -50,8 +50,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: TwinCatAdsTool_v1.2.${{ github.run_number }}.zip
-        asset_name: TwinCatAdsTool_v1.2.${{ github.run_number }}.zip
+        asset_path: TwinCatAdsTool_v1.3.${{ github.run_number }}.zip
+        asset_name: TwinCatAdsTool_v1.3.${{ github.run_number }}.zip
         asset_content_type: application/zip
     - name: Upload ReadyToRun
       id: upload-release-asset2 
@@ -60,6 +60,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: TwinCatAdsTool_ReadyToRun_v1.2.${{ github.run_number }}.zip
-        asset_name: TwinCatAdsTool_ReadyToRun_v1.2.${{ github.run_number }}.zip
+        asset_path: TwinCatAdsTool_ReadyToRun_v1.3.${{ github.run_number }}.zip
+        asset_name: TwinCatAdsTool_ReadyToRun_v1.3.${{ github.run_number }}.zip
         asset_content_type: application/zip

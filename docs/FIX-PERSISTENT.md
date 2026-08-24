@@ -62,9 +62,10 @@ saltata con il motivo — e backup e restore mostrano il report nell'interfaccia
 conversione JSON, costruzione dei path, coercizione dei tipi, gestione dei mismatch.
 `TwinCatAdsTool.Logic` e `.Interfaces` compilano senza errori né warning.
 
-**Non verificato** — la GUI non è compilabile su macOS: `net5.0-windows10.0.19041` richiede il
-targeting pack WinRT, disponibile solo da .NET 6 in su. Le modifiche a `BackupViewModel`,
-`RestoreViewModel` e alle due view sono quindi **da compilare su Windows**.
+**Verificato dopo l'aggiornamento a .NET 8** (branch `upgrade/net8-modern-ui`): con quel branch
+la GUI si compila anche da macOS, quindi le modifiche a `BackupViewModel`, `RestoreViewModel` e
+alle due view compilano senza errori. Sul solo branch dei fix, che è ancora .NET 5, non erano
+compilabili fuori da Windows.
 
 **Da validare sul campo** (richiede PLC):
 1. tempo di backup prima/dopo sullo stesso impianto;
