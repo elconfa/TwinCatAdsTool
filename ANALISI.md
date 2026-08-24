@@ -5,6 +5,10 @@ Autore: Federico Barresi — Licenza MIT (2019) — Sponsor: evopro AG
 Commit analizzato: `03ab6c7` (2026-04-17, master) — clonato con `--depth=1`
 Data analisi: 2026-08-24
 
+> **Stato:** questo documento fotografa il repository **come clonato da upstream**.
+> Il branch `fix/persistent-performance-reporting` ha gia corretto i punti 4, 7 e 8 del
+> capitolo 6 e riscritto il motore di backup/restore. Vedi `docs/FIX-PERSISTENT.md`.
+
 ---
 
 ## 1. Cos'è
