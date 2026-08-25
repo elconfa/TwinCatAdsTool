@@ -335,3 +335,6 @@ Tests/TwinCatAdsTool.Logic.Tests/obj/
 
 # local publish output
 publish/
+
+# macos
+.DS_Store
