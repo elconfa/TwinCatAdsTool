@@ -10,6 +10,11 @@ TwinCAT 4024 and 4026) and a Fluent interface.
 Everything below is either measured on a real plant or stated as unverified. Where a claim rests on
 a measurement, the numbers are given.
 
+<img src="docs/images/screenshot-dark.png" width="720"/>
+
+Dark by default, with a light theme a click away — the *Theme* button at the foot of the navigation
+panel switches between the two without a restart, and the choice is remembered.
+
 ---
 
 ## Why this fork exists
@@ -266,8 +271,14 @@ black text boxes with green text, no dark theme. MahApps and Material Design wer
 overlapping jobs and neither looked like the operating system the application runs on.
 
 The UI is now built on **WPF-UI 4.3.0** (Fluent / WinUI 3): Mica backdrop, `NavigationView` instead
-of the tab control, Windows 11 control templates, dark by default with a toggle whose choice is
-remembered.
+of the tab control, Windows 11 control templates.
+
+**Both a dark and a light theme**, dark being the default. The *Theme* button at the foot of the
+navigation panel switches between them with the window open — no restart — and the choice is kept in
+`%LOCALAPPDATA%\TwinCatAdsTool`, not next to the executable, which on a cabinet PC is usually not
+writable. No colour is a literal in the views: they are all theme lookups, which is what lets the
+switch propagate. The plot is the one thing that does not go through the WPF resource system, so it
+repaints itself when the theme changes.
 
 Details, and the parts that are deliberately unchanged, in [docs/UI-FLUENT.md](docs/UI-FLUENT.md).
 
