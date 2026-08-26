@@ -152,6 +152,58 @@ namespace TwinCatAdsTool.Logic.Tests
         }
 
         /// <summary>
+        /// A TIME, an LTIME and a TOD all normalize to a TimeSpan, and json has no notion of one:
+        /// a backup read back from disk hands the value over as a string. TimeSpan does not
+        /// implement IConvertible either, so the general conversion cannot do this on its own.
+        ///
+        /// Regression: measured on a live plc on 2026-08-26, a backup restored onto the very plc
+        /// it came from reported "backup value '00:00:00.3000000' does not fit the plc type" for
+        /// every one of these four variables.
+        /// </summary>
+        [Theory]
+        [InlineData("00:00:00.3000000")]
+        [InlineData("12.01:26:40.8640000")]
+        [InlineData("09:00:00")]
+        public void Reads_a_time_span_back_from_the_text_a_backup_holds(string text)
+        {
+            var expected = TimeSpan.Parse(text);
+
+            Assert.True(ValueCoercion.TryCoerce(text, TimeSpan.Zero, out var coerced));
+            Assert.Equal(expected, coerced);
+        }
+
+        [Fact]
+        public void Round_trips_a_plc_time_through_the_text_of_a_backup()
+        {
+            var original = new TIME(TimeSpan.FromMilliseconds(300));
+
+            // What the backup file holds is the text of the normalized value, nothing more.
+            var text = ValueCoercion.Normalize(original).ToString();
+
+            Assert.True(ValueCoercion.TryCoerce(text, TimeSpan.Zero, out var coerced));
+            Assert.True(ValueCoercion.TryCoerce(coerced, original, out var restored));
+            Assert.Equal(original.Time, ((TIME) restored).Time);
+        }
+
+        [Fact]
+        public void Round_trips_a_plc_ltime_through_the_text_of_a_backup()
+        {
+            var original = new LTIME(new TimeSpan(12, 1, 26, 40, 864));
+
+            var text = ValueCoercion.Normalize(original).ToString();
+
+            Assert.True(ValueCoercion.TryCoerce(text, TimeSpan.Zero, out var coerced));
+            Assert.True(ValueCoercion.TryCoerce(coerced, original, out var restored));
+            Assert.Equal(original.Time, ((LTIME) restored).Time);
+        }
+
+        [Fact]
+        public void Refuses_text_that_is_not_a_time_span()
+        {
+            Assert.False(ValueCoercion.TryCoerce("not a duration", TimeSpan.Zero, out _));
+        }
+
+        /// <summary>
         /// Ads 7 exposes a DT as a <see cref="DateTime"/> with <see cref="DateTimeKind.Unspecified"/>
         /// holding local wall clock time - the plc type carries no zone. To reason about instants
         /// it has to be read back as local, which is how the library wrote it.

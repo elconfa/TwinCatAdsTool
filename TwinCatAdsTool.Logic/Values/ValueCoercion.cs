@@ -71,6 +71,16 @@ namespace TwinCatAdsTool.Logic.Values
                     return true;
                 }
 
+                if (targetType == typeof(TimeSpan))
+                {
+                    // TimeSpan does not implement IConvertible, so the ChangeType below throws
+                    // on it. This is the path every restore of a TIME, LTIME or TOD takes: those
+                    // normalize to a TimeSpan, json has no notion of one, and a backup read back
+                    // from disk therefore hands the value over as a string.
+                    coerced = ToTimeSpan(value);
+                    return true;
+                }
+
                 if (targetType.IsEnum)
                 {
                     coerced = value is string text
