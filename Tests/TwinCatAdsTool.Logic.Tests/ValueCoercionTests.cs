@@ -66,12 +66,12 @@ namespace TwinCatAdsTool.Logic.Tests
 
             Assert.True(ValueCoercion.TryCoerce(moment, new DT(), out var coerced));
             Assert.IsType<DT>(coerced);
-            Assert.Equal(moment, ((DT) coerced).Date);
+            Assert.Equal(moment, InstantOf((DT) coerced));
         }
 
         /// <summary>
-        /// DT hands its value back in the local time zone, so the invariant that has to hold
-        /// across a backup and restore is the instant itself.
+        /// DT holds a local wall clock time with no zone of its own, so the invariant that has to
+        /// hold across a backup and restore is the instant itself.
         /// </summary>
         [Fact]
         public void Preserves_the_instant_of_a_utc_timestamp()
@@ -80,7 +80,7 @@ namespace TwinCatAdsTool.Logic.Tests
 
             Assert.True(ValueCoercion.TryCoerce(moment, new DT(), out var coerced));
 
-            Assert.Equal(moment.UtcDateTime, ((DT) coerced).Date.UtcDateTime);
+            Assert.Equal(moment.UtcDateTime, InstantOf((DT) coerced).UtcDateTime);
         }
 
         /// <summary>
@@ -94,7 +94,7 @@ namespace TwinCatAdsTool.Logic.Tests
 
             Assert.True(ValueCoercion.TryCoerce(moment, new DT(), out var coerced));
 
-            Assert.Equal(moment, ((DT) coerced).Date.UtcDateTime);
+            Assert.Equal(moment, InstantOf((DT) coerced).UtcDateTime);
         }
 
         [Fact]
@@ -117,10 +117,17 @@ namespace TwinCatAdsTool.Logic.Tests
             Assert.Equal(span, ((LTIME) coerced).Value);
         }
 
+        /// <summary>
+        /// Ads 7 hands the plc date types back as <see cref="DateTime"/>; version 5 used
+        /// <see cref="DateTimeOffset"/>. The offset was an artefact of the wrapper - a plc DT has
+        /// no time zone - so the backup now stores the timestamp as the plc holds it. What has to
+        /// stay true is the round trip, which
+        /// <see cref="Round_trips_a_plc_timestamp_through_json_and_back"/> covers.
+        /// </summary>
         [Fact]
         public void Normalizes_plc_time_types_into_plain_values()
         {
-            Assert.IsType<DateTimeOffset>(ValueCoercion.Normalize(new DT(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero))));
+            Assert.IsType<DateTime>(ValueCoercion.Normalize(new DT(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero))));
             Assert.IsType<TimeSpan>(ValueCoercion.Normalize(new TIME(TimeSpan.FromSeconds(1))));
             Assert.IsType<TimeSpan>(ValueCoercion.Normalize(new LTIME(TimeSpan.FromSeconds(1))));
         }
@@ -140,8 +147,16 @@ namespace TwinCatAdsTool.Logic.Tests
             var normalized = ValueCoercion.Normalize(original);
             Assert.True(ValueCoercion.TryCoerce(normalized, new DT(), out var restored));
 
-            Assert.Equal(original.Date.UtcDateTime, ((DT) restored).Date.UtcDateTime);
+            Assert.Equal(original.Ticks, ((DT) restored).Ticks);
+            Assert.Equal(InstantOf(original), InstantOf((DT) restored));
         }
+
+        /// <summary>
+        /// Ads 7 exposes a DT as a <see cref="DateTime"/> with <see cref="DateTimeKind.Unspecified"/>
+        /// holding local wall clock time - the plc type carries no zone. To reason about instants
+        /// it has to be read back as local, which is how the library wrote it.
+        /// </summary>
+        private static DateTimeOffset InstantOf(DT dt) => new DateTimeOffset(dt.Value);
 
         private enum Mode
         {

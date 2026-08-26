@@ -93,15 +93,20 @@ namespace TwinCatAdsTool.Logic.Values
         /// <summary>
         /// Unwraps the PlcOpen wrapper types into plain .net values so they end up in the backup
         /// as readable iso timestamps rather than as nested objects.
+        ///
+        /// Ads 7 exposes these as <see cref="DateTime"/>; version 5 handed back a
+        /// <see cref="DateTimeOffset"/> forced into the local time zone. A plc DT carries no time
+        /// zone at all, so dropping the offset is what the type actually means - and it removes
+        /// the shift a backup taken in one zone showed when restored in another.
         /// </summary>
         public static object Normalize(object value)
         {
             switch (value)
             {
                 case DT dt:
-                    return dt.Date;
+                    return dt.Value;
                 case DATE date:
-                    return date.Date;
+                    return date.Value;
                 case TOD tod:
                     return tod.Time;
                 case TIME time:

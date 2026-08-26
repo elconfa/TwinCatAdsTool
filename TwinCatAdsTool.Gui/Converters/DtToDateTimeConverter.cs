@@ -23,7 +23,8 @@ namespace TwinCatAdsTool.Gui.Converters
         {
             if (value is DT dt)
             {
-                return dt.Date;
+                // Ads 7 renamed this: Date (a DateTimeOffset) became Value (a DateTime).
+                return dt.Value;
             }
 
             if (value is DateTime dateTime)

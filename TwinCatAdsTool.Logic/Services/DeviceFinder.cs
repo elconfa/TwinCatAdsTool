@@ -131,7 +131,7 @@ namespace TwinCatAdsTool.Logic.Services
 
                     device.TcVersion.Version = tail[i + 4];
                     device.TcVersion.Revision = tail[i + 5];
-                    device.TcVersion.Build = tail[i + 6] + tail[i + 7] * 256;
+                    device.TcVersion.Build = (short) (tail[i + 6] + tail[i + 7] * 256);
                     break;
                 }
             }
