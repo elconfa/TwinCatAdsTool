@@ -1,0 +1,16 @@
+{
+  "GVL": {
+    "PersVarGlobalUser1_1": {
+      "Int1": 1001,
+      "Int2": 1002,
+      "Bool1": false,
+      "InInVar": {
+        "IntInIn1": 9999,
+        "RealInIn1": 999.5
+      },
+      "Bool2": false,
+      "Bool3": true
+    },
+    "PersVarGlobalArray": [11, 22, 33, 44]
+  }
+}
