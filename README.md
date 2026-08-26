@@ -300,6 +300,24 @@ the child symbols has not been measured. Test 2 in
 
 ---
 
+## Download
+
+[**Latest release**](https://github.com/elconfa/TwinCatAdsTool/releases/latest) — two builds of the
+same application:
+
+| Asset | When to use it |
+|---|---|
+| `TwinCatAdsTool-<version>-win-x64-selfcontained.zip` | Nothing to install on the target machine. The obvious choice for a cabinet PC. |
+| `TwinCatAdsTool-<version>-win-x64.zip` | Much smaller, but needs the .NET 8 Desktop Runtime already present. |
+
+Unzip and run the executable; no installation. `log.config` beside it is optional — without it the
+application logs to `logs\` on its own, and the file is only there for anyone who wants to change
+the logging.
+
+Versions follow the tag the release was built from, and the tag sets the version of every assembly,
+so what the release is called, what the binary reports and what the window shows are the same
+number.
+
 ## Requirements
 
 TwinCAT ADS must be installed, and a route to the PLC configured. See
