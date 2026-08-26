@@ -34,6 +34,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0   # the tag annotation is the release body, so the tags have to come along
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -64,8 +66,15 @@ jobs:
         Compress-Archive -Path out\framework-dependent\TwinCatAdsTool.exe, out\framework-dependent\log.config -DestinationPath "TwinCatAdsTool-$v-win-x64.zip"
         Compress-Archive -Path out\self-contained\TwinCatAdsTool.exe, out\self-contained\log.config -DestinationPath "TwinCatAdsTool-$v-win-x64-selfcontained.zip"
 
+    # The release notes are the annotation of the tag itself, so what is released, what it is
+    # called and what it says it changed all come from one place. --generate-notes only produces
+    # a list of commit subjects, which is not what someone deciding whether to upgrade needs.
+    - name: Release notes from the tag
+      shell: pwsh
+      run: git tag -l --format='%(contents)' '${{ github.ref_name }}' | Out-File -Encoding utf8 release-notes.md
+
     - name: Release
       shell: pwsh
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: gh release create '${{ github.ref_name }}' --title '${{ github.ref_name }}' --generate-notes (Get-Item *.zip).Name
+      run: gh release create '${{ github.ref_name }}' --title '${{ github.ref_name }}' --notes-file release-notes.md (Get-Item *.zip).Name
