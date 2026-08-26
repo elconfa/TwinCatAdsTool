@@ -122,7 +122,12 @@ namespace TwinCatAdsTool.Logic.Services
         {
             if (state == TwinCAT.ConnectionState.Connected)
             {
-                var loader = SymbolLoaderFactory.Create(Client, new SymbolLoaderSettings(SymbolsLoadMode.VirtualTree));
+                // DynamicTree, not VirtualTree: only this mode makes the library resolve a
+                // structure into a DynamicValue whose members can be walked. Under VirtualTree a
+                // STRUCT comes back as a raw byte[], which the backup then serialised as a list of
+                // numbers - the values were all there, but the shape was lost and the report still
+                // said the variable had been read successfully.
+                var loader = SymbolLoaderFactory.Create(Client, new SymbolLoaderSettings(SymbolsLoadMode.DynamicTree));
                 TreeViewSymbols = loader.Symbols;
 
                 var loader2 = SymbolLoaderFactory.Create(Client, new SymbolLoaderSettings(SymbolsLoadMode.Flat));
