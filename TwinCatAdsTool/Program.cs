@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -124,7 +125,7 @@ namespace TwinCatAdsTool
 		{
 			try
 			{
-				File.AppendAllText(Path.Combine(ExecutableDirectory(), "startup-error.txt"),
+				File.AppendAllText(Path.Combine(DiagnosticsDirectory(), "startup-error.txt"),
 					text + Environment.NewLine + new string('-', 80) + Environment.NewLine,
 					Encoding.UTF8);
 			}
@@ -158,6 +159,54 @@ namespace TwinCatAdsTool
 				: Path.GetDirectoryName(path) ?? AppContext.BaseDirectory;
 		}
 
+		/// <summary>
+		/// The folder the log files and the diagnostic notes are written into: next to the
+		/// executable, so that a copied folder carries its own logs.
+		///
+		/// Windows can refuse to write there - a protected folder, a read only share, controlled
+		/// folder access - and then nothing appears at all, not even the note explaining why,
+		/// which is exactly what a missing log folder looks like. The per user application data
+		/// folder is always writable, so it is used as the fallback.
+		/// </summary>
+		private static string DiagnosticsDirectory()
+		{
+			if (diagnosticsDirectory != null)
+			{
+				return diagnosticsDirectory;
+			}
+
+			var next = ExecutableDirectory();
+
+			diagnosticsDirectory = IsWritable(next)
+				? next
+				: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+					Constants.LoggingRepositoryName);
+
+			return diagnosticsDirectory;
+		}
+
+		private static string diagnosticsDirectory;
+
+		private static bool IsWritable(string directory)
+		{
+			try
+			{
+				Directory.CreateDirectory(directory);
+
+				var probe = Path.Combine(directory, $".write-probe-{Guid.NewGuid():N}");
+				using (File.Create(probe))
+				{
+				}
+
+				File.Delete(probe);
+				return true;
+			}
+			catch (Exception)
+			{
+				return false;
+			}
+		}
+
 		private static void Log(params string[] messages)
 		{
 			try
@@ -179,17 +228,132 @@ namespace TwinCatAdsTool
 			// somewhere else entirely, so the working directory is not good enough.
 			var config = new FileInfo(Path.Combine(ExecutableDirectory(), "log.config"));
 
+			// The appenders write to a path relative to the process working directory, which is
+			// not necessarily the folder holding the executable. Passing the folder in as a
+			// property keeps the log files next to it, where they can actually be found - or in
+			// the fallback folder when that one cannot be written to.
+			log4net.GlobalContext.Properties["LogDirectory"] = DiagnosticsDirectory();
+
+			// Configure the repository the loggers really end up in. LoggerFactory lives in
+			// TwinCatAdsTool.Interfaces and calls LogManager.GetLogger(name), an overload that
+			// resolves the repository from the *calling assembly*. Configuring without saying
+			// which repository would configure this executable's one instead, leaving every
+			// logger the application creates without a single appender - which is why no log
+			// file was ever written.
+			var repository = log4net.LogManager.GetRepository(typeof(LoggerFactory).Assembly);
+
 			if (config.Exists)
 			{
-				log4net.Config.XmlConfigurator.Configure(config);
+				log4net.Config.XmlConfigurator.Configure(repository, config);
 			}
 			else
 			{
-				log4net.Config.BasicConfigurator.Configure();
+				ConfigureDefaultLogging(repository);
 			}
 
 			CreateRepository(Constants.LoggingRepositoryName);
 			CreateRepository(Constants.LoggingObservationRepositoryName);
+
+			// A logger that quietly writes nowhere is worse than none: it makes every later
+			// problem undiagnosable. Write one line and check it actually landed on disk.
+			LoggerFactory.GetLogger().Info("Logging initialised");
+			ReportLoggingProblems(repository, config);
+		}
+
+		/// <summary>
+		/// Sets up logging without a configuration file, so that the executable on its own is
+		/// enough. This is a single file build: it gets copied somewhere by itself far more often
+		/// than with the folder it was published in, and log.config left behind used to mean no
+		/// log at all - the previous fallback wrote to a console FreeConsole has already closed.
+		///
+		/// log.config stays an override for whoever wants one; it is the only way to send the
+		/// observation logger to a file of its own, which this default does not do.
+		/// </summary>
+		private static void ConfigureDefaultLogging(log4net.Repository.ILoggerRepository repository)
+		{
+			var layout = new log4net.Layout.PatternLayout(
+				"[%date{dd.MM. HH:mm:ss.fff}] %-5level - %C{1}.%M - %message%newline");
+			layout.ActivateOptions();
+
+			var appender = new log4net.Appender.RollingFileAppender
+			{
+				Name = "RollingFile",
+				File = Path.Combine(DiagnosticsDirectory(), "logs", "TwinCatAdsTool.log"),
+				AppendToFile = true,
+				RollingStyle = log4net.Appender.RollingFileAppender.RollingMode.Size,
+				MaxSizeRollBackups = 10,
+				MaximumFileSize = "10MB",
+				StaticLogFileName = true,
+				Encoding = Encoding.UTF8,
+				Layout = layout
+			};
+
+			appender.ActivateOptions();
+
+			log4net.Config.BasicConfigurator.Configure(repository, appender);
+
+			if (repository is log4net.Repository.Hierarchy.Hierarchy hierarchy)
+			{
+				hierarchy.Root.Level = log4net.Core.Level.All;
+			}
+		}
+
+		/// <summary>
+		/// Leaves a note next to the executable when the configured file appenders did not
+		/// produce a file, so a missing log folder can be explained instead of guessed at.
+		/// </summary>
+		private static void ReportLoggingProblems(log4net.Repository.ILoggerRepository repository, FileInfo config)
+		{
+			try
+			{
+				var appenders = repository.GetAppenders()
+					.OfType<log4net.Appender.FileAppender>()
+					.ToList();
+
+				var missing = appenders.Where(a => !File.Exists(a.File)).ToList();
+
+				if (appenders.Count > 0 && missing.Count == 0)
+				{
+					return;
+				}
+
+				var lines = new List<string>
+				{
+					$"TwinCatAdsTool {Constants.Version} - logging is not writing any file",
+					$"{DateTime.Now:yyyy-MM-dd HH:mm:ss}",
+					$"config    : {config.FullName} (exists: {config.Exists})",
+					$"repository: {repository.Name}",
+					$"log folder: {DiagnosticsDirectory()}",
+					$"appenders : {appenders.Count}"
+				};
+
+				foreach (var appender in missing)
+				{
+					lines.Add($"  no file at: {appender.File}");
+
+					// An appender that cannot open its file keeps the reason to itself: it is
+					// handed to the error handler and reported nowhere else. Without this the
+					// note would say a file is missing without ever saying why.
+					if (appender.ErrorHandler is log4net.Util.OnlyOnceErrorHandler handler &&
+					    !string.IsNullOrEmpty(handler.ErrorMessage))
+					{
+						lines.Add($"    reason  : {handler.ErrorMessage}");
+					}
+				}
+
+				if (appenders.Count == 0)
+				{
+					lines.Add("  no file appender was configured at all");
+				}
+
+				File.WriteAllText(Path.Combine(DiagnosticsDirectory(), "logging-error.txt"),
+					string.Join(Environment.NewLine, lines) + Environment.NewLine,
+					Encoding.UTF8);
+			}
+			catch (Exception)
+			{
+				// Read only folder: nothing further can be done from here.
+			}
 		}
 
 		private static void CreateRepository(string name)

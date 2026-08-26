@@ -23,6 +23,14 @@
   <ItemGroup>
     <None Update="log.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <!-- Program.CreateLogger looks for this next to the executable. Copying it to the output
+           only is not enough: without these a published build silently falls back to
+           BasicConfigurator and logs to a console FreeConsole has already closed.
+           ExcludeFromSingleFile keeps it out of the bundle - content packed into the single file
+           is unpacked into a temporary folder, not next to the executable, so the logger would
+           still not find it. It has to stay a plain file the user can also edit. -->
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </None>
   </ItemGroup>
 
