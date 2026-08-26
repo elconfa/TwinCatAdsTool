@@ -7,8 +7,6 @@ using System.Reactive;
 using System.Reactive.Subjects;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
 using DiffPlex;
 using DiffPlex.DiffBuilder;
 using DiffPlex.DiffBuilder.Model;
@@ -17,6 +15,7 @@ using Newtonsoft.Json.Linq;
 using ReactiveUI;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using TwinCAT;
+using TwinCatAdsTool.Gui.Models;
 using TwinCatAdsTool.Gui.Properties;
 using TwinCatAdsTool.Interfaces.Extensions;
 using TwinCatAdsTool.Interfaces.Services;
@@ -30,11 +29,13 @@ namespace TwinCatAdsTool.Gui.ViewModels
         private readonly IClientService clientService;
         private readonly SideBySideDiffBuilder comparisonBuilder = new SideBySideDiffBuilder(new Differ());
         private SideBySideDiffModel comparisonModel = new SideBySideDiffModel();
-        private IEnumerable<ListBoxItem> leftBoxText;
+        private IReadOnlyList<DiffLine> leftLines = new List<DiffLine>();
         private readonly IPersistentVariableService persistentVariableService;
-        private IEnumerable<ListBoxItem> rightBoxText;
+        private IReadOnlyList<DiffLine> rightLines = new List<DiffLine>();
         private string sourceLeft;
         private string sourceRight;
+        private int differenceCount;
+        private bool hasComparison;
 
         public CompareViewModel(IClientService clientService, IPersistentVariableService persistentVariableService)
         {
@@ -42,25 +43,17 @@ namespace TwinCatAdsTool.Gui.ViewModels
             this.persistentVariableService = persistentVariableService;
         }
 
-        public IEnumerable<ListBoxItem> LeftBoxText
+        public IReadOnlyList<DiffLine> LeftLines
         {
-            get
-            {
-                if (leftBoxText == null)
-                {
-                    leftBoxText = new List<ListBoxItem>();
-                }
-
-                return leftBoxText;
-            }
+            get => leftLines;
             set
             {
-                if (Equals(value, leftBoxText))
+                if (Equals(value, leftLines))
                 {
                     return;
                 }
 
-                leftBoxText = value;
+                leftLines = value;
                 raisePropertyChanged();
             }
         }
@@ -109,25 +102,47 @@ namespace TwinCatAdsTool.Gui.ViewModels
             }
         }
 
+        /// <summary>
+        /// Lines that differ between the two sides. Scrolling through a few thousand lines to find
+        /// out whether there is any difference at all is not a reasonable way to answer that.
+        /// </summary>
+        public int DifferenceCount
+        {
+            get => differenceCount;
+            set
+            {
+                if (value == differenceCount) return;
+                differenceCount = value;
+                raisePropertyChanged();
+                raisePropertyChanged(nameof(AreIdentical));
+            }
+        }
+
+        /// <summary>True once both sides hold something to compare.</summary>
+        public bool HasComparison
+        {
+            get => hasComparison;
+            set
+            {
+                if (value == hasComparison) return;
+                hasComparison = value;
+                raisePropertyChanged();
+            }
+        }
+
+        public bool AreIdentical => DifferenceCount == 0;
+
         public ReactiveCommand<RxVoid, RxVoid> LoadLeft { get; set; }
         public ReactiveCommand<RxVoid, RxVoid> LoadRight { get; set; }
         public ReactiveCommand<RxVoid, RxVoid> ReadLeft { get; set; }
         public ReactiveCommand<RxVoid, RxVoid> ReadRight { get; set; }
-        public IEnumerable<ListBoxItem> RightBoxText
+        public IReadOnlyList<DiffLine> RightLines
         {
-            get
-            {
-                if (rightBoxText == null)
-                {
-                    rightBoxText = new List<ListBoxItem>();
-                }
-
-                return rightBoxText;
-            }
+            get => rightLines;
             set
             {
-                if (Equals(value, rightBoxText)) return;
-                rightBoxText = value;
+                if (Equals(value, rightLines)) return;
+                rightLines = value;
                 raisePropertyChanged();
             }
         }
@@ -173,53 +188,39 @@ namespace TwinCatAdsTool.Gui.ViewModels
             var leftBox = diffModel.OldText.Lines;
             var rightBox = diffModel.NewText.Lines;
 
-            // all items have the same fixed height. this makes synchronizing of the scrollbars easier
-            LeftBoxText = leftBox.Select(x => new ListBoxItem
-            {
-                Content = x.Text,
-                Background = GetBGColor(x),
-                Height = 20,
-                Padding = new System.Windows.Thickness(0.0)
-            });
-            RightBoxText = rightBox.Select(x => new ListBoxItem
-            {
-                Content = x.Text,
-                Background = GetBGColor(x),
-                Height = 20,
-                Padding = new System.Windows.Thickness(0.0)
-            });
+            // Every row is the same fixed height, which is what lets the two panes be kept in
+            // step by line number rather than by pixel.
+            LeftLines = leftBox.Select(ToLine).ToList();
+            RightLines = rightBox.Select(ToLine).ToList();
 
-            Logger.Debug("Generated Comparison Model");
+            DifferenceCount = rightBox.Count(line => line.Type != ChangeType.Unchanged);
+            HasComparison = !string.IsNullOrEmpty(left) || !string.IsNullOrEmpty(right);
+
+            Logger.Debug($"Generated Comparison Model - {DifferenceCount} differing lines");
             return diffModel;
         }
 
-        //manually coloring the ListboxItems depending on their diff state
-        //compare https://github.com/SciGit/scigit-client/blob/master/DiffPlex/SilverlightDiffer/TextBoxDiffRenderer.cs
-        private SolidColorBrush GetBGColor(DiffPiece diffPiece)
+        private static DiffLine ToLine(DiffPiece piece)
         {
-            var fillColor = new SolidColorBrush(Colors.Transparent);
-            switch (diffPiece.Type)
-            {
-                case ChangeType.Deleted:
-                    fillColor = new SolidColorBrush(Color.FromArgb(255, 255, 200, 100));
-                    break;
-                case ChangeType.Inserted:
-                    fillColor = new SolidColorBrush(Color.FromArgb(255, 255, 255, 0));
-                    break;
-                case ChangeType.Unchanged:
-                    fillColor = new SolidColorBrush(Colors.White);
-                    break;
-                case ChangeType.Modified:
-                    fillColor = new SolidColorBrush(Color.FromArgb(255, 220, 220, 255));
-                    break;
-                case ChangeType.Imaginary:
-                    fillColor = new SolidColorBrush(Color.FromArgb(255, 200, 200, 200));
-                    break;
-            }
-
-            return fillColor;
+            return new DiffLine(piece.Text, KindOf(piece.Type));
         }
 
+        private static DiffKind KindOf(ChangeType type)
+        {
+            switch (type)
+            {
+                case ChangeType.Deleted:
+                    return DiffKind.Deleted;
+                case ChangeType.Inserted:
+                    return DiffKind.Inserted;
+                case ChangeType.Modified:
+                    return DiffKind.Modified;
+                case ChangeType.Imaginary:
+                    return DiffKind.Filler;
+                default:
+                    return DiffKind.Unchanged;
+            }
+        }
 
         private Task<(JObject, string)> LoadJson()
         {

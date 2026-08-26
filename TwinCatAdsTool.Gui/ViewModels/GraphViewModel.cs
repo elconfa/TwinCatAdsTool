@@ -13,6 +13,8 @@ using OxyPlot.Legends;
 using OxyPlot.Series;
 using ReactiveUI;
 using TwinCatAdsTool.Interfaces.Extensions;
+using Wpf.Ui.Appearance;
+using Color = System.Windows.Media.Color;
 
 namespace TwinCatAdsTool.Gui.ViewModels
 {
@@ -62,6 +64,10 @@ namespace TwinCatAdsTool.Gui.ViewModels
         public override void Init()
         {
             PlotModel = CreateDefaultPlotModel();
+            ApplyPlotTheme();
+
+            // Oxyplot draws with its own colours, so it has to be told about the theme switch.
+            ApplicationThemeManager.Changed += OnApplicationThemeChanged;
 
             SymbolCache.Connect()
                 .Transform(CreateSymbolLineSeries)
@@ -78,6 +84,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
             };
 
             PlotModel.Axes.Add(axis);
+            ApplyPlotTheme();
         }
 
         private static PlotModel CreateDefaultPlotModel()
@@ -87,13 +94,63 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
             plotModel.Legends.Add(new Legend
             {
-                LegendBorder = OxyColor.FromRgb(0x80, 0x80, 0x80),
                 LegendBorderThickness = 1,
-                LegendBackground = OxyColor.FromRgb(0xFF, 0xFF, 0xFF),
                 LegendPosition = LegendPosition.LeftBottom
             });
 
             return plotModel;
+        }
+
+        private void OnApplicationThemeChanged(ApplicationTheme currentApplicationTheme, Color systemAccent)
+        {
+            ApplyPlotTheme();
+        }
+
+        /// <summary>
+        /// Repaints the plot chrome in the colours of the active theme. A white legend on a dark
+        /// window, which is what the fixed colours produced, is unreadable.
+        /// </summary>
+        private void ApplyPlotTheme()
+        {
+            if (PlotModel == null)
+            {
+                return;
+            }
+
+            var dark = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
+
+            var foreground = dark ? OxyColor.FromRgb(0xE6, 0xE6, 0xE6) : OxyColor.FromRgb(0x1B, 0x1B, 0x1B);
+            var chrome = dark ? OxyColor.FromRgb(0x50, 0x50, 0x50) : OxyColor.FromRgb(0xC8, 0xC8, 0xC8);
+            var surface = dark ? OxyColor.FromArgb(0xB0, 0x2B, 0x2B, 0x2B) : OxyColor.FromArgb(0xB0, 0xFF, 0xFF, 0xFF);
+
+            PlotModel.Background = OxyColors.Transparent;
+            PlotModel.TextColor = foreground;
+            PlotModel.TitleColor = foreground;
+            PlotModel.PlotAreaBorderColor = chrome;
+
+            foreach (var legend in PlotModel.Legends)
+            {
+                legend.LegendBackground = surface;
+                legend.LegendBorder = chrome;
+                legend.TextColor = foreground;
+            }
+
+            foreach (var axis in PlotModel.Axes.OfType<DateTimeAxis>())
+            {
+                axis.TicklineColor = chrome;
+                axis.TextColor = foreground;
+                axis.MajorGridlineColor = chrome;
+                axis.MinorGridlineColor = chrome;
+            }
+
+            PlotModel.InvalidatePlot(false);
+            raisePropertyChanged(nameof(PlotModel));
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            ApplicationThemeManager.Changed -= OnApplicationThemeChanged;
+            base.Dispose(disposing);
         }
 
         public void RemoveSymbol(SymbolObservationViewModel symbol)

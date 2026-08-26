@@ -1,0 +1,131 @@
+<!--
+    Design tokens of the application.
+
+    Every spacing, radius and shared style lives here rather than being repeated as a literal
+    Margin on each control, so the look can be adjusted in one place. Colours are never literals:
+    they are DynamicResource lookups into the WPF UI theme dictionary, which is what makes the
+    light/dark switch work at runtime.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                    xmlns:converters="clr-namespace:TwinCatAdsTool.Gui.Converters"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <!--  Shared converters, so each view no longer declares its own copy.  -->
+    <converters:BoolToVisibilityConverter x:Key="VisibleIfTrue" IfTrue="Visible" IfFalse="Collapsed" />
+    <converters:BoolToVisibilityConverter x:Key="VisibleIfFalse" IfTrue="Collapsed" IfFalse="Visible" />
+    <converters:BoolToVisibilityConverter x:Key="VisibleIfBusy" IfTrue="Visible" IfFalse="Collapsed" />
+
+    <!--  Spacing scale. Multiples of 4, the same rhythm the Fluent controls are built on.  -->
+    <sys:Double x:Key="SpaceXs">4</sys:Double>
+    <sys:Double x:Key="SpaceSm">8</sys:Double>
+    <sys:Double x:Key="SpaceMd">12</sys:Double>
+    <sys:Double x:Key="SpaceLg">16</sys:Double>
+    <sys:Double x:Key="SpaceXl">24</sys:Double>
+
+    <Thickness x:Key="PagePadding">20,16,20,16</Thickness>
+    <Thickness x:Key="CardPadding">16</Thickness>
+    <Thickness x:Key="ToolbarItemMargin">0,0,8,0</Thickness>
+    <Thickness x:Key="StackedItemMargin">0,0,0,12</Thickness>
+
+    <CornerRadius x:Key="SurfaceCornerRadius">8</CornerRadius>
+    <CornerRadius x:Key="SmallCornerRadius">4</CornerRadius>
+
+    <!--  Monospace face used wherever json or plc values are shown.  -->
+    <FontFamily x:Key="MonoFontFamily">Cascadia Mono, Consolas, Courier New</FontFamily>
+
+    <!--
+        A raised surface holding one group of related controls. Replaces the bare StackPanels
+        the views used to stack directly onto the window background.
+    -->
+    <Style x:Key="SurfaceCard" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource SurfaceCornerRadius}" />
+        <Setter Property="Padding" Value="{StaticResource CardPadding}" />
+    </Style>
+
+    <!--  Same surface, but for content that fills the remaining space (json, diffs, grids).  -->
+    <Style x:Key="ContentSurface" TargetType="Border" BasedOn="{StaticResource SurfaceCard}">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+
+    <!--  Toolbar row: the buttons no longer carry a hand written Margin each.  -->
+    <Style x:Key="Toolbar" TargetType="StackPanel">
+        <Setter Property="Orientation" Value="Horizontal" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="ToolbarButton" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+        <Setter Property="Margin" Value="{StaticResource ToolbarItemMargin}" />
+        <Setter Property="Padding" Value="12,6" />
+    </Style>
+
+    <Style x:Key="ToolbarPrimaryButton" TargetType="ui:Button" BasedOn="{StaticResource ToolbarButton}">
+        <Setter Property="Appearance" Value="Primary" />
+    </Style>
+
+    <!--  Small all caps label introducing a group. Carries the visual hierarchy the views lacked.  -->
+    <Style x:Key="SectionCaption" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+
+    <Style x:Key="SecondaryText" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!--
+        Read only console showing json. The old views hardcoded green on black, which ignored the
+        theme; these colours follow it.
+    -->
+    <Style x:Key="MonoDisplay" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Setter Property="FontFamily" Value="{StaticResource MonoFontFamily}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="IsReadOnly" Value="True" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="Padding" Value="12" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="VerticalContentAlignment" Value="Top" />
+    </Style>
+
+    <Style x:Key="MonoEdit" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Setter Property="FontFamily" Value="{StaticResource MonoFontFamily}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="AcceptsReturn" Value="True" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+    </Style>
+
+    <!--  Connection status dot next to the ads state.  -->
+    <Style x:Key="StatusDot" TargetType="Ellipse">
+        <Setter Property="Width" Value="8" />
+        <Setter Property="Height" Value="8" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0,0,8,0" />
+    </Style>
+
+    <!--
+        The xceed controls have no fluent template. Aligning their metrics with the WPF UI ones
+        keeps the rows of the observation grid from looking assembled out of two toolkits.
+    -->
+    <Style x:Key="XceedInput" TargetType="Control">
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="Padding" Value="6,0" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+</ResourceDictionary>

@@ -1,87 +1,94 @@
-﻿<UserControl x:Class="TwinCatAdsTool.Gui.Views.ExploreView"
+<UserControl x:Class="TwinCatAdsTool.Gui.Views.ExploreView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:forms="clr-namespace:System.Windows.Forms;assembly=System.Windows.Forms"
              xmlns:viewModels="clr-namespace:TwinCatAdsTool.Gui.ViewModels"
              xmlns:views="clr-namespace:TwinCatAdsTool.Gui.Views"
-             xmlns:typeSystem="clr-namespace:TwinCAT.TypeSystem;assembly=TwinCAT.Ads"
              xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
              xmlns:converters="clr-namespace:TwinCatAdsTool.Gui.Converters"
              xmlns:properties="clr-namespace:TwinCatAdsTool.Gui.Properties"
-             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:typeSystem1="clr-namespace:TwinCAT.TypeSystem;assembly=TwinCAT.Ads.Abstractions"
-             xmlns:controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800"
+             d:DesignHeight="600" d:DesignWidth="1000"
              FocusManager.FocusedElement="{Binding ElementName=SearchBox}">
     <UserControl.Resources>
 
-        <converters:BoolToVisibilityConverter x:Key="VisibileIfFalse" IfTrue="Collapsed" IfFalse="Visible"></converters:BoolToVisibilityConverter>
-        <converters:BoolToVisibilityConverter x:Key="VisibileIfTrue" IfTrue="Visible" IfFalse="Collapsed"></converters:BoolToVisibilityConverter>
-        
-
-        <HierarchicalDataTemplate x:Key="TreeNodeTemplate" DataType="{x:Type typeSystem1:ISymbol}" ItemsSource="{Binding SubSymbols}">
-            <StackPanel Orientation="Horizontal">
-                <Label Content="{Binding InstancePath}" VerticalContentAlignment="Center"/>
-                <Button Style="{StaticResource MaterialDesignIconForegroundButton}" 
-                        Visibility="{Binding IsContainerType, Converter={StaticResource VisibileIfFalse}}"
-                        Width="24" Height="24"
-                        CommandParameter="{Binding}"
-                        Command="{Binding  Path=DataContext.AddObserverCmd, RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}"
-                        
-                        >
-                    <materialDesign:PackIcon Kind="PlusCircleOutline" Width="16" Height="16" Foreground="CornflowerBlue"/>
-                </Button>
-            </StackPanel>
-        </HierarchicalDataTemplate>
-        
         <converters:LTimeToTimeSpanConverter x:Key="LTimeToTimeSpanConverter" />
         <converters:TimeToTimeSpanConverter x:Key="TimeToTimeSpanConverter" />
         <converters:DtToDateTimeConverter x:Key="DtToDateTimeConverter" />
+        <converters:NumberBoxValueConverter x:Key="NumberBoxValue" />
+
+        <HierarchicalDataTemplate x:Key="TreeNodeTemplate" DataType="{x:Type typeSystem1:ISymbol}" ItemsSource="{Binding SubSymbols}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding InstancePath}" VerticalAlignment="Center" />
+                <!--  Only leaves carry a value that can be observed.  -->
+                <ui:Button Visibility="{Binding IsContainerType, Converter={StaticResource VisibleIfFalse}}"
+                           Appearance="Transparent"
+                           Padding="4"
+                           Margin="6,0,0,0"
+                           ToolTip="Watch this symbol"
+                           CommandParameter="{Binding}"
+                           Command="{Binding Path=DataContext.AddObserverCmd, RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}"
+                           Icon="{ui:SymbolIcon AddCircle20}" />
+            </StackPanel>
+        </HierarchicalDataTemplate>
 
         <DataTemplate x:Key="StringTemplate" DataType="{x:Type viewModels:SymbolObservationViewModel}">
-            <TextBox Text="{Binding NewValue, UpdateSourceTrigger=PropertyChanged}" 
-                     VerticalContentAlignment="Center"
-                     VerticalAlignment="Center"
-                     materialDesign:HintAssist.HelperText="Input string" MinWidth="150" />
+            <ui:TextBox Text="{Binding NewValue, UpdateSourceTrigger=PropertyChanged}"
+                        PlaceholderText="Input string"
+                        MinWidth="150" />
         </DataTemplate>
 
         <DataTemplate x:Key="IntTemplate">
-            <xctk:IntegerUpDown Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged}" />
+            <ui:NumberBox Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource NumberBoxValue}}"
+                          MaxDecimalPlaces="0"
+                          ClearButtonEnabled="False"
+                          MinWidth="110" />
         </DataTemplate>
 
         <DataTemplate x:Key="LTimeSpanTemplate">
-            <xctk:TimeSpanUpDown Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource LTimeToTimeSpanConverter}}" Width="150"/>
+            <xctk:TimeSpanUpDown Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource LTimeToTimeSpanConverter}}" Width="150" />
         </DataTemplate>
-        
+
         <DataTemplate x:Key="TimeSpanTemplate">
-            <xctk:TimeSpanUpDown Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource LTimeToTimeSpanConverter}}" Width="150"/>
+            <xctk:TimeSpanUpDown Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource LTimeToTimeSpanConverter}}" Width="150" />
         </DataTemplate>
 
         <DataTemplate x:Key="ByteTemplate">
-            <xctk:ByteUpDown Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
+            <ui:NumberBox Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource NumberBoxValue}}"
+                          Minimum="0"
+                          Maximum="255"
+                          MaxDecimalPlaces="0"
+                          ClearButtonEnabled="False"
+                          MinWidth="90" />
         </DataTemplate>
 
         <DataTemplate x:Key="DateTimeTemplate">
-            <xctk:DateTimePicker Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource DtToDateTimeConverter}}" Width="150"/>
+            <xctk:DateTimePicker Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource DtToDateTimeConverter}}" Width="170" />
         </DataTemplate>
 
         <DataTemplate x:Key="BoolTemplate">
-            <CheckBox IsChecked="{Binding NewValue, UpdateSourceTrigger=PropertyChanged}" />
+            <ui:ToggleSwitch IsChecked="{Binding NewValue, UpdateSourceTrigger=PropertyChanged}" />
         </DataTemplate>
 
         <DataTemplate x:Key="SingleTemplate">
-            <xctk:SingleUpDown Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
+            <ui:NumberBox Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource NumberBoxValue}}"
+                          MaxDecimalPlaces="6"
+                          ClearButtonEnabled="False"
+                          MinWidth="110" />
         </DataTemplate>
 
         <DataTemplate x:Key="DoubleTemplate">
-            <xctk:DoubleUpDown Value="{Binding NewValue}" Width="100"/>
+            <ui:NumberBox Value="{Binding NewValue, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource NumberBoxValue}}"
+                          MaxDecimalPlaces="9"
+                          ClearButtonEnabled="False"
+                          MinWidth="110" />
         </DataTemplate>
 
         <DataTemplate x:Key="DefaultTemplate">
-            
+
         </DataTemplate>
 
         <views:SymbolObservationTemplateSelector x:Key="SymbolObservationTemplateSelector"
@@ -95,180 +102,184 @@
                                                  LTimeSpanTemplate="{StaticResource LTimeSpanTemplate}"
                                                  TimeSpanTemplate="{StaticResource TimeSpanTemplate}"
                                                  DoubleTemplate="{StaticResource DoubleTemplate}" />
-        
+
     </UserControl.Resources>
 
-    <Grid>
+    <Grid Margin="{StaticResource PagePadding}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="2*" />
-            <ColumnDefinition Width="5"/>
-            <ColumnDefinition Width="6*" />
+            <ColumnDefinition Width="2*" MinWidth="260" />
+            <ColumnDefinition Width="12" />
+            <ColumnDefinition Width="5*" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="5"/>
-            <RowDefinition />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        
 
-        <TabControl Grid.Column="0" Grid.Row="0" Grid.RowSpan="4" TabStripPlacement="Left" Margin="5">
+        <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
+                   Text="{x:Static properties:Resources.Explore}"
+                   FontSize="24"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,12" />
 
-            <TabItem Header="{x:Static properties:Resources.Tree}">
+        <!--  Symbol source: browse the tree or search it, plus a way to reload it from the plc.  -->
+        <Border Grid.Row="1" Grid.RowSpan="3" Grid.Column="0" Style="{StaticResource ContentSurface}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-                <TreeView ItemsSource="{Binding TreeNodes}" ItemTemplate="{StaticResource TreeNodeTemplate}" />
+                <Grid Grid.Row="0" Margin="12,12,12,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ui:TextBox x:Name="SearchBox"
+                                Grid.Column="0"
+                                IsEnabled="{Binding IsConnected}"
+                                Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                PlaceholderText="{x:Static properties:Resources.EnterSymbolnameToSearch}"
+                                Icon="{ui:SymbolIcon Search24}"
+                                ClearButtonEnabled="True">
+                        <ui:TextBox.InputBindings>
+                            <KeyBinding Command="{Binding TextBoxEnterCommand}" Key="Enter" />
+                        </ui:TextBox.InputBindings>
+                    </ui:TextBox>
 
-            </TabItem>
+                    <ui:Button Grid.Column="1"
+                               Command="{Binding Read}"
+                               Appearance="Transparent"
+                               Margin="8,0,0,0"
+                               Padding="8"
+                               ToolTip="{x:Static properties:Resources.RefreshDataFromPLC}"
+                               Icon="{ui:SymbolIcon ArrowSync24}" />
+                </Grid>
 
-            <TabItem Header="{x:Static properties:Resources.Search}">
-
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                    <Grid ScrollViewer.CanContentScroll="True">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <TextBox Grid.Column="1" Grid.Row="0"
-                                 IsEnabled="{Binding IsConnected}"
-                                 x:Name="SearchBox"
-                                 VerticalContentAlignment="Center"
-                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 materialDesign:HintAssist.HelperText="{x:Static properties:Resources.EnterSymbolnameToSearch}"
-                                 >
-                            <TextBox.InputBindings>
-                                <KeyBinding Command="{Binding TextBoxEnterCommand}"
-                                            Key="Enter" />
-                            </TextBox.InputBindings>
-                        </TextBox>
-
-                        <TreeView Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="2" Margin="5"
-                                  ItemsSource="{Binding SearchResults}"
+                <TabControl Grid.Row="1" Margin="8,0,8,8">
+                    <TabItem Header="{x:Static properties:Resources.Tree}">
+                        <TreeView ItemsSource="{Binding TreeNodes}"
                                   ItemTemplate="{StaticResource TreeNodeTemplate}"
-                                   />
-                    </Grid>
-                </ScrollViewer>
+                                  Background="Transparent"
+                                  BorderThickness="0" />
+                    </TabItem>
 
-            </TabItem>
+                    <TabItem Header="{x:Static properties:Resources.Search}">
+                        <TreeView ItemsSource="{Binding SearchResults}"
+                                  ItemTemplate="{StaticResource TreeNodeTemplate}"
+                                  Background="Transparent"
+                                  BorderThickness="0" />
+                    </TabItem>
+                </TabControl>
+            </Grid>
+        </Border>
 
-            <TabItem Header="{x:Static properties:Resources.RefreshDataFromPLC}">
-                <Button Command="{Binding Read}"
-                        Style="{StaticResource MaterialDesignFloatingActionMiniButton}"
-                        Margin="8">
-                    <materialDesign:PackIcon Kind="RefreshCircle" Width="32" Height="32"/>
-                </Button>
-            </TabItem>
-        </TabControl>
-        
-        <GridSplitter Grid.Column="1" Grid.Row="0" Grid.RowSpan="4" HorizontalAlignment="Stretch" />
-        
-        <DataGrid  Grid.Column="2" Grid.Row="0" 
-                   DataContext="{Binding ObserverViewModel}"
-                   ItemsSource="{Binding ViewModels}"
-                   AutoGenerateColumns="False"
-                   AlternationCount="2"
-                   AlternatingRowBackground="#330078D7"
-                   >
+        <GridSplitter Grid.Column="1" Grid.Row="1" Grid.RowSpan="3"
+                      HorizontalAlignment="Stretch"
+                      Background="Transparent" />
 
-            <DataGrid.Columns>
-                    
-                    <DataGridTemplateColumn Header=""  Width="Auto">
+        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource ContentSurface}">
+            <ui:DataGrid DataContext="{Binding ObserverViewModel}"
+                         ItemsSource="{Binding ViewModels}"
+                         AutoGenerateColumns="False"
+                         CanUserAddRows="False"
+                         HeadersVisibility="Column"
+                         GridLinesVisibility="Horizontal"
+                         Background="Transparent"
+                         BorderThickness="0">
+
+                <ui:DataGrid.Columns>
+
+                    <DataGridTemplateColumn Header="" Width="Auto">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate DataType="{x:Type viewModels:SymbolObservationViewModel}">
-                                    <Button Command="{Binding  Path=DataContext.CmdDelete, RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}" 
-                                            CommandParameter="{Binding}" 
-                                            Style="{StaticResource MaterialDesignIconForegroundButton}"
-                                            Padding="0"
-                                            Margin="0"
-                                            ToolTip="{Binding FullName}">
-                                        <materialDesign:PackIcon Kind="MinusCircleOutline" Foreground="Red"/>
-                                    </Button>
+                                <ui:Button Command="{Binding Path=DataContext.CmdDelete, RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}"
+                                           CommandParameter="{Binding}"
+                                           Appearance="Transparent"
+                                           Padding="6"
+                                           Margin="2"
+                                           ToolTip="{Binding FullName}"
+                                           Icon="{ui:SymbolIcon Dismiss20}" />
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                
-                <DataGridTextColumn  Header="{x:Static properties:Resources.Name}" Width="Auto" Binding="{Binding Name}" >
-                    <DataGridTextColumn.ElementStyle>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="VerticalAlignment" Value="Center"/>
-                            <Setter Property="HorizontalAlignment" Value="Left"/>
-                            <Setter Property="ToolTip" Value="{Binding FullName}"/>
-                        </Style>
-                    </DataGridTextColumn.ElementStyle>
-                </DataGridTextColumn>
 
-                    <DataGridTextColumn  Header="{x:Static properties:Resources.Value}" Width="Auto" Binding="{Binding Value}" >
+                    <DataGridTextColumn Header="{x:Static properties:Resources.Name}" Width="*" Binding="{Binding Name}">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="HorizontalAlignment" Value="Left"/>
+                                <Setter Property="VerticalAlignment" Value="Center" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                                <Setter Property="ToolTip" Value="{Binding FullName}" />
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
 
-                    <DataGridTemplateColumn Header="{x:Static properties:Resources.NewValue}" 
-                                    CellTemplateSelector="{StaticResource SymbolObservationTemplateSelector}" Width="Auto"/>
+                    <DataGridTextColumn Header="{x:Static properties:Resources.Value}" Width="Auto" Binding="{Binding Value}">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="VerticalAlignment" Value="Center" />
+                                <Setter Property="FontFamily" Value="{StaticResource MonoFontFamily}" />
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
 
-                    <DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="{x:Static properties:Resources.NewValue}"
+                                            CellTemplateSelector="{StaticResource SymbolObservationTemplateSelector}"
+                                            Width="Auto" />
+
+                    <DataGridTemplateColumn Width="Auto">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate DataType="{x:Type viewModels:SymbolObservationViewModel}">
-                                <Button 
-                                    Style="{StaticResource MaterialDesignFloatingActionMiniButton}"
-                                    Command="{Binding CmdSubmit}" 
-                                    ToolTip="{x:Static properties:Resources.Submit}" 
-                                    Padding="0"
-                                    Margin="0"
-                                    IsEnabled="{Binding SupportsSubmit}"
-                                    Visibility="{Binding SupportsSubmit, Converter={StaticResource VisibileIfTrue}}">
-                                    <materialDesign:PackIcon Kind="Send" />
-                                </Button>
+                                <ui:Button Command="{Binding CmdSubmit}"
+                                           ToolTip="{x:Static properties:Resources.Submit}"
+                                           Appearance="Primary"
+                                           Padding="6"
+                                           Margin="2"
+                                           IsEnabled="{Binding SupportsSubmit}"
+                                           Visibility="{Binding SupportsSubmit, Converter={StaticResource VisibleIfTrue}}"
+                                           Icon="{ui:SymbolIcon Send20}" />
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn>
+                    <DataGridTemplateColumn Width="Auto">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate DataType="{x:Type viewModels:SymbolObservationViewModel}">
-                                <Button Command="{Binding  Path=DataContext.CmdAddGraph, RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}" 
-                                        CommandParameter="{Binding}" 
-                                        ToolTip="{x:Static properties:Resources.AddGraph}" 
-                                        Style="{StaticResource MaterialDesignFloatingActionMiniButton}"
-                                        Visibility="{Binding SupportsGraph, Converter={StaticResource VisibileIfTrue}}">
-                                    <materialDesign:PackIcon Kind="ChartLine" />
-                                </Button>
+                                <StackPanel Orientation="Horizontal"
+                                            Visibility="{Binding SupportsGraph, Converter={StaticResource VisibleIfTrue}}">
+                                    <ui:Button Command="{Binding Path=DataContext.CmdAddGraph, RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}"
+                                               CommandParameter="{Binding}"
+                                               ToolTip="{x:Static properties:Resources.AddGraph}"
+                                               Appearance="Transparent"
+                                               Padding="6"
+                                               Margin="2"
+                                               Icon="{ui:SymbolIcon ChartMultiple20}" />
+                                    <ui:Button Command="{Binding Path=DataContext.CmdRemoveGraph, RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}"
+                                               CommandParameter="{Binding}"
+                                               ToolTip="{x:Static properties:Resources.RemoveGraph}"
+                                               Appearance="Transparent"
+                                               Padding="6"
+                                               Margin="2"
+                                               Icon="{ui:SymbolIcon Subtract20}" />
+                                </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn>
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate DataType="{x:Type viewModels:SymbolObservationViewModel}">
-                                <Button Command="{Binding  Path=DataContext.CmdRemoveGraph, RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}" 
-                                        CommandParameter="{Binding}" 
-                                        ToolTip="{x:Static properties:Resources.RemoveGraph}" 
-                                        Style="{StaticResource MaterialDesignFloatingActionMiniButton}"
-                                        Visibility="{Binding SupportsGraph, Converter={StaticResource VisibileIfTrue}}">
-                                    <materialDesign:PackIcon Kind="TrayRemove" />
-                                </Button>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                </ui:DataGrid.Columns>
+            </ui:DataGrid>
+        </Border>
 
-                    
+        <GridSplitter Grid.Column="2" Grid.Row="2"
+                      HorizontalAlignment="Stretch"
+                      Background="Transparent"
+                      ResizeDirection="Rows"
+                      ResizeBehavior="PreviousAndNext" />
 
-            </DataGrid.Columns>
-        </DataGrid>
-
-
-
-        <GridSplitter Grid.Column="2" Grid.Row="2" HorizontalAlignment="Stretch"       ResizeDirection="Rows"
-                      ResizeBehavior="PreviousAndNext"/>
-
-        <views:GraphView Grid.Column="2" Grid.Row="3"  DataContext="{Binding GraphViewModel}" />
+        <Border Grid.Row="3" Grid.Column="2" Style="{StaticResource ContentSurface}">
+            <views:GraphView DataContext="{Binding GraphViewModel}" />
+        </Border>
     </Grid>
 </UserControl>

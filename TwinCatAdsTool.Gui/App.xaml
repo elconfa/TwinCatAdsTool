@@ -1,45 +1,40 @@
-﻿<Application x:Class="TwinCatAdsTool.Gui.App"
+<Application x:Class="TwinCatAdsTool.Gui.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:system="clr-namespace:System;assembly=mscorlib"
              xmlns:gui="clr-namespace:TwinCatAdsTool.Gui"
              xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
-             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
     <Application.Resources>
         <ResourceDictionary>
-            
-            <gui:ViewModelLocator x:Key="Locator" />
-            
 
-            <Style TargetType="xctk:DateTimePicker">
-                <Setter Property="Margin" Value="5"></Setter>
-            </Style>
-
-            <Style TargetType="xctk:ByteUpDown">
-                <Setter Property="Margin" Value="5"></Setter>
-            </Style>
-
-            <Style TargetType="xctk:IntegerUpDown">
-                <Setter Property="Margin" Value="5"></Setter>
-            </Style>
-
-            <Style TargetType="xctk:TimeSpanUpDown">
-                <Setter Property="Margin" Value="5"></Setter>
-            </Style>
-
-            
             <ResourceDictionary.MergedDictionaries>
-                <!-- MahApps.Metro resource dictionaries. Make sure that all file names are Case Sensitive! -->
-                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml" />
-                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
-                <!-- Theme setting -->
-                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Light.Blue.xaml" />
-                
-                <!-- Material design 5 builds the palette itself: BundledTheme replaces the
-                     hand merged colour dictionaries and the brushes derived from them. -->
-                <materialDesign:BundledTheme BaseTheme="Light" PrimaryColor="Blue" SecondaryColor="Lime" />
-                <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign2.Defaults.xaml" />
+                <!--
+                    Dark is the starting theme; ApplicationThemeManager swaps it at runtime when
+                    the user toggles it from the title bar. Merged first so the styles below can
+                    resolve the tokens by StaticResource.
+                -->
+                <ui:ThemesDictionary Theme="Dark" />
+                <ui:ControlsDictionary />
+                <ResourceDictionary Source="pack://application:,,,/TwinCatAdsTool.Gui;component/Themes/Tokens.xaml" />
             </ResourceDictionary.MergedDictionaries>
+
+            <!--
+                Deferred on purpose: the real locator, the one holding the ninject kernel, is put
+                under this key by Program.ReplaceViewModelLocator before anything looks it up.
+            -->
+            <gui:ViewModelLocator x:Key="Locator" />
+
+            <!--
+                Xceed ships no fluent template for these. Giving them the theme brushes stops them
+                from showing up as light grey boxes in a dark window.
+            -->
+            <Style TargetType="xctk:DateTimePicker" BasedOn="{StaticResource XceedInput}" />
+            <Style TargetType="xctk:ByteUpDown" BasedOn="{StaticResource XceedInput}" />
+            <Style TargetType="xctk:IntegerUpDown" BasedOn="{StaticResource XceedInput}" />
+            <Style TargetType="xctk:TimeSpanUpDown" BasedOn="{StaticResource XceedInput}" />
+            <Style TargetType="xctk:SingleUpDown" BasedOn="{StaticResource XceedInput}" />
+            <Style TargetType="xctk:DoubleUpDown" BasedOn="{StaticResource XceedInput}" />
+
         </ResourceDictionary>
 
     </Application.Resources>

@@ -18,6 +18,7 @@ using TwinCatAdsTool.Gui.Properties;
 using TwinCatAdsTool.Interfaces.Extensions;
 using TwinCatAdsTool.Interfaces.Models;
 using TwinCatAdsTool.Interfaces.Services;
+using InfoBarSeverity = Wpf.Ui.Controls.InfoBarSeverity;
 using MessageBox = System.Windows.MessageBox;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
@@ -35,6 +36,13 @@ namespace TwinCatAdsTool.Gui.ViewModels
         private ObservableCollection<VariableViewModel> liveVariables;
         private PersistentOperationReport lastReport;
         private string lastReportSummary;
+        private bool hasReport;
+        private InfoBarSeverity reportSeverity = InfoBarSeverity.Informational;
+        private string reportTitle;
+        private string currentTask = string.Empty;
+        private double progressPercentage;
+        private bool isBusy;
+        private string sourceFile;
 
         public RestoreViewModel(IClientService clientService, IPersistentVariableService persistentVariableService)
         {
@@ -102,8 +110,103 @@ namespace TwinCatAdsTool.Gui.ViewModels
             }
         }
 
+        /// <summary>The info bar stays out of the way until there is something to report.</summary>
+        public bool HasReport
+        {
+            get => hasReport;
+            set
+            {
+                if (value == hasReport) return;
+                hasReport = value;
+                raisePropertyChanged();
+            }
+        }
+
+        public InfoBarSeverity ReportSeverity
+        {
+            get => reportSeverity;
+            set
+            {
+                if (value == reportSeverity) return;
+                reportSeverity = value;
+                raisePropertyChanged();
+            }
+        }
+
+        public string ReportTitle
+        {
+            get => reportTitle;
+            set
+            {
+                if (value == reportTitle) return;
+                reportTitle = value;
+                raisePropertyChanged();
+            }
+        }
+
+        /// <summary>Name of the loaded backup file, so it is clear what is about to be written.</summary>
+        public string SourceFile
+        {
+            get => sourceFile;
+            set
+            {
+                if (value == sourceFile) return;
+                sourceFile = value;
+                raisePropertyChanged();
+                raisePropertyChanged(nameof(HasSourceFile));
+            }
+        }
+
+        public bool HasSourceFile => !string.IsNullOrEmpty(SourceFile);
+
+        /// <summary>Number of top level variables the loaded file covers.</summary>
+        public int VariableCount => DisplayVariables.Count;
+
+        /// <summary>What the restore is doing right now, empty while nothing runs.</summary>
+        public string CurrentTask
+        {
+            get => currentTask;
+            private set
+            {
+                if (value == currentTask) return;
+                currentTask = value;
+                raisePropertyChanged();
+            }
+        }
+
+        /// <summary>Share of the persistent variables already written, 0 to 100.</summary>
+        public double ProgressPercentage
+        {
+            get => progressPercentage;
+            private set
+            {
+                if (value.Equals(progressPercentage)) return;
+                progressPercentage = value;
+                raisePropertyChanged();
+            }
+        }
+
+        /// <summary>True while a restore is in flight.</summary>
+        public bool IsBusy
+        {
+            get => isBusy;
+            private set
+            {
+                if (value == isBusy) return;
+                isBusy = value;
+                raisePropertyChanged();
+            }
+        }
+
         public override void Init()
         {
+            persistentVariableService.CurrentTask
+                .ObserveOnDispatcher()
+                .Do(ShowProgress)
+                .Retry()
+                .Subscribe()
+                .AddDisposableTo(Disposables);
+
             fileVariableSubject
                 .ObserveOnDispatcher()
                 .Do(x => UpdateVariables(x, FileVariables))
@@ -124,6 +227,13 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
             ShowReport = ReactiveCommand.CreateFromTask(ShowLastReport)
                 .AddDisposableTo(Disposables);
+        }
+
+        private void ShowProgress(OperationProgress progress)
+        {
+            CurrentTask = progress?.Message ?? string.Empty;
+            ProgressPercentage = progress?.Percentage ?? 0.0;
+            IsBusy = progress?.IsRunning == true;
         }
 
         private void AddVariable(IEnumerable<JProperty> token, ObservableCollection<VariableViewModel> variables)
@@ -164,6 +274,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
             {
                 JObject json = JObject.Parse(File.ReadAllText(openFileDialog.FileName));
                 fileVariableSubject.OnNext(json);
+                SourceFile = System.IO.Path.GetFileName(openFileDialog.FileName);
                 canWrite.OnNext(true);
             }
 
@@ -178,6 +289,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
             DisplayVariables.AddRange(array);
 
             raisePropertyChanged("DisplayVariables");
+            raisePropertyChanged(nameof(VariableCount));
         }
 
         private void UpdateVariables(JObject json, ObservableCollection<VariableViewModel> viewModels)
@@ -213,6 +325,9 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
             lastReport = report;
             LastReportSummary = report.Summary;
+            ReportTitle = report.IsComplete ? "Restore complete" : "Restore incomplete";
+            ReportSeverity = report.IsComplete ? InfoBarSeverity.Success : InfoBarSeverity.Warning;
+            HasReport = true;
             Logger.Debug($"Restore finished - {report.Summary}");
 
             // Anything that was not written has to reach the user, not just the log file.
@@ -245,8 +360,7 @@ namespace TwinCatAdsTool.Gui.ViewModels
         private static string Preview(PersistentOperationReport report)
         {
             const int maxLines = 10;
-            var lines = report.Results
-                .Where(r => r.State != VariableOperationState.Succeeded)
+            var lines = report.Problems()
                 .Take(maxLines)
                 .Select(r => r.ToString())
                 .ToList();

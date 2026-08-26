@@ -1,59 +1,122 @@
-﻿<mah:MetroWindow  x:Class="TwinCatAdsTool.Gui.Views.MainWindow"
-                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-                  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-                  xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
-                  xmlns:views="clr-namespace:TwinCatAdsTool.Gui.Views"
-                  DataContext="{Binding MainWindowViewModel, Source={StaticResource Locator}}"
-                  mc:Ignorable="d" 
-                  Title="TwinCAT ADS Tool"
-                  WindowStartupLocation="CenterScreen"
-                  AllowDrop="True"
-                  MinWidth="800" MinHeight="600"
-                  Width="950" Height="800"
-                  GlowBrush="{DynamicResource MahApps.Brushes.Accent}"
-                  d:DesignHeight="450" d:DesignWidth="800">
+<ui:FluentWindow x:Class="TwinCatAdsTool.Gui.Views.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:views="clr-namespace:TwinCatAdsTool.Gui.Views"
+                 xmlns:pages="clr-namespace:TwinCatAdsTool.Gui.Views.Pages"
+                 xmlns:properties="clr-namespace:TwinCatAdsTool.Gui.Properties"
+                 xmlns:converters="clr-namespace:TwinCatAdsTool.Gui.Converters"
+                 DataContext="{Binding MainWindowViewModel, Source={StaticResource Locator}}"
+                 mc:Ignorable="d"
+                 Title="TwinCAT ADS Tool"
+                 WindowStartupLocation="CenterScreen"
+                 AllowDrop="True"
+                 MinWidth="900" MinHeight="640"
+                 Width="1180" Height="820"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica"
+                 WindowCornerPreference="Round"
+                 Background="{DynamicResource ApplicationBackgroundBrush}"
+                 d:DesignHeight="820" d:DesignWidth="1180">
 
-    <Window.Resources>
-        
-    </Window.Resources>
-    
-    <mah:MetroWindow.IconTemplate>
-        <DataTemplate>
-            <Image Source="../Resources/twincat.png"></Image>
-        </DataTemplate>
-    </mah:MetroWindow.IconTemplate>
-    
-    <mah:MetroWindow.RightWindowCommands>
-        <mah:WindowCommands>
-            <StackPanel Orientation="Horizontal">
-                
-                <TextBlock VerticalAlignment="Top" Margin="0,0,16,0">sponsored by <Image Source="../Resources/evopro.png" Height="24" Margin="2" VerticalAlignment="Top"/></TextBlock>
-                
-                <TextBlock
-                    VerticalAlignment="Center"
-                    Opacity="0.6"
-                    Text="{Binding Version}" />
-            </StackPanel>
-        </mah:WindowCommands>
-    </mah:MetroWindow.RightWindowCommands>
-    
-    <!-- <mah:MetroWindow.LeftWindowCommands> -->
-    <!--     <mah:WindowCommands> -->
-    <!--         <StackPanel Orientation="Horizontal"> -->
-    <!--         </StackPanel> -->
-    <!-- -->
-    <!--     </mah:WindowCommands> -->
-    <!-- </mah:MetroWindow.LeftWindowCommands> -->
-    
+    <ui:FluentWindow.Resources>
+        <converters:SymbolToIconElementConverter x:Key="SymbolToIcon" />
+    </ui:FluentWindow.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <views:ConnectionCabView DataContext="{Binding ConnectionCabViewModel}" Grid.Row="0"/>
-        <views:TabsView DataContext="{Binding TabsViewModel}" Grid.Row="1"/>
+
+        <ui:TitleBar Grid.Row="0"
+                     Title="TwinCAT ADS Tool"
+                     ShowMaximize="True"
+                     ShowMinimize="True">
+            <ui:TitleBar.Icon>
+                <ui:ImageIcon Source="pack://application:,,,/TwinCatAdsTool.Gui;component/Resources/twincat.png" />
+            </ui:TitleBar.Icon>
+            <ui:TitleBar.TrailingContent>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                    <TextBlock Text="{x:Static properties:Resources.PoweredBy}"
+                               Style="{StaticResource SecondaryText}"
+                               FontSize="11"
+                               Margin="0,0,6,0" />
+                    <Image Source="pack://application:,,,/TwinCatAdsTool.Gui;component/Resources/evopro.png"
+                           Height="18"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0" />
+                    <TextBlock Text="{Binding Version}"
+                               Style="{StaticResource SecondaryText}"
+                               FontSize="11"
+                               Margin="0,0,4,0" />
+                </StackPanel>
+            </ui:TitleBar.TrailingContent>
+        </ui:TitleBar>
+
+        <!--  Connecting is not one of the four activities, it is the precondition for all of them.  -->
+        <views:ConnectionCabView Grid.Row="1" DataContext="{Binding ConnectionCabViewModel}" />
+
+        <ui:NavigationView x:Name="RootNavigation"
+                           Grid.Row="2"
+                           PaneDisplayMode="Left"
+                           OpenPaneLength="200"
+                           IsBackButtonVisible="Collapsed"
+                           IsPaneToggleVisible="True"
+                           FrameMargin="0"
+                           HeaderVisibility="Collapsed"
+                           Transition="FadeInWithSlide">
+
+            <ui:NavigationView.MenuItems>
+                <ui:NavigationViewItem Content="{x:Static properties:Resources.Backup}"
+                                       TargetPageType="{x:Type pages:BackupPage}"
+                                       ToolTip="Read every persistent variable from the plc">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="ArrowDownload24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+
+                <ui:NavigationViewItem Content="{x:Static properties:Resources.Restore}"
+                                       TargetPageType="{x:Type pages:RestorePage}"
+                                       ToolTip="Write a backup file back onto the plc">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="ArrowUpload24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+
+                <ui:NavigationViewItem Content="{x:Static properties:Resources.Compare}"
+                                       TargetPageType="{x:Type pages:ComparePage}"
+                                       ToolTip="Diff two backups, or a backup against the live values">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="ArrowSwap24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+
+                <ui:NavigationViewItem Content="{x:Static properties:Resources.Explore}"
+                                       TargetPageType="{x:Type pages:ExplorePage}"
+                                       ToolTip="Browse the symbol tree and watch values live">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Search24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+            </ui:NavigationView.MenuItems>
+
+            <ui:NavigationView.PaneFooter>
+                <ui:Button Command="{Binding ToggleTheme}"
+                           ToolTip="{Binding ThemeToolTip}"
+                           Icon="{Binding ThemeIcon, Converter={StaticResource SymbolToIcon}}"
+                           Appearance="Transparent"
+                           HorizontalAlignment="Stretch"
+                           HorizontalContentAlignment="Left"
+                           Margin="4,0,4,8"
+                           Padding="10,8"
+                           Content="Theme" />
+            </ui:NavigationView.PaneFooter>
+
+        </ui:NavigationView>
     </Grid>
-    
-</mah:MetroWindow>
+
+</ui:FluentWindow>
