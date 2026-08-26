@@ -33,6 +33,10 @@ namespace TwinCatAdsTool.Interfaces.Services
         [Obsolete("Use ReadPersistentVariables, which also reports the variables that could not be read.")]
         Task<JObject> ReadGlobalPersistentVariables(AdsClient client, IInstanceCollection<ISymbol> symbols);
 
-        IObservable<string> CurrentTask { get; }
+        /// <summary>
+        /// Progress of the backup or restore that is currently running. Emits
+        /// <see cref="OperationProgress.Idle"/> when nothing is in flight.
+        /// </summary>
+        IObservable<OperationProgress> CurrentTask { get; }
     }
 }

@@ -36,7 +36,7 @@ namespace TwinCatAdsTool.Logic.Services
 
         public async Task<PersistentBackup> ReadAsync(IAdsConnection connection,
             IEnumerable<ISymbol> symbols,
-            IProgress<string> progress,
+            IProgress<OperationProgress> progress,
             CancellationToken cancel)
         {
             var stopwatch = Stopwatch.StartNew();
@@ -56,7 +56,10 @@ namespace TwinCatAdsTool.Logic.Services
             {
                 cancel.ThrowIfCancellationRequested();
 
-                progress?.Report($"Reading {done + 1}-{done + batch.Count} of {scan.Roots.Count} persistent variables...");
+                progress?.Report(new OperationProgress(
+                    $"Reading {done + 1}-{done + batch.Count} of {scan.Roots.Count} persistent variables...",
+                    done,
+                    scan.Roots.Count));
 
                 var values = await ReadBatchAsync(connection, batch, results, cancel).ConfigureAwait(false);
 
@@ -85,7 +88,7 @@ namespace TwinCatAdsTool.Logic.Services
             }
 
             stopwatch.Stop();
-            progress?.Report(string.Empty);
+            progress?.Report(OperationProgress.Idle);
 
             var report = new PersistentOperationReport(results, stopwatch.Elapsed);
             logger.Info($"Backup finished: {report.Summary}");
@@ -166,7 +169,16 @@ namespace TwinCatAdsTool.Logic.Services
                     return null;
                 }
 
-                return await valueSymbol.ReadValueAsync(cancel).ConfigureAwait(false);
+                // Same wrapper as in the writer: the value sits inside the result.
+                var read = await valueSymbol.ReadValueAsync(cancel).ConfigureAwait(false);
+                if (!read.Succeeded)
+                {
+                    results.Add(VariableOperationResult.Failure(symbol.InstancePath,
+                        $"ads error {(AdsErrorCode) read.ErrorCode}"));
+                    return null;
+                }
+
+                return read.Value;
             }
             catch (Exception e)
             {

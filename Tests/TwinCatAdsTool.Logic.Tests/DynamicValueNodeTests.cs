@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 using TwinCatAdsTool.Logic.Values;
 using Xunit;
@@ -22,7 +23,7 @@ namespace TwinCatAdsTool.Logic.Tests
 
             Assert.True(node.IsArray);
             Assert.False(node.IsStruct);
-            Assert.Equal(3, node.ArrayLength);
+            Assert.Equal(3, node.Elements.Count());
         }
 
         [Fact]
@@ -85,53 +86,46 @@ namespace TwinCatAdsTool.Logic.Tests
         }
 
         [Fact]
-        public void Writing_a_backup_back_into_an_array_of_bool()
+        public void Planning_a_restore_of_an_array_of_bool_reaches_every_element()
         {
-            var target = new[] {false, false, false};
-
-            var result = PlcJsonConverter.ApplyJson(new DynamicValueNode(target),
+            var plan = PlcLeafPlanner.Plan(new DynamicValueNode(new[] {false, false, false}),
                 JArray.Parse("[true, false, true]"), "PersistentVars.Alarms");
 
-            Assert.True(result.IsClean);
-            Assert.Equal(new[] {true, false, true}, target);
+            Assert.True(plan.IsClean);
+            Assert.Equal(new object[] {true, false, true}, plan.Writes.Select(w => w.Value));
+            Assert.Equal("PersistentVars.Alarms[2]", plan.Writes.Last().Path);
         }
 
         [Fact]
-        public void Writing_a_backup_back_into_an_array_of_byte_narrows_the_json_numbers()
+        public void Planning_a_restore_of_an_array_of_byte_narrows_the_json_numbers()
         {
-            var target = new byte[] {0, 0};
-
-            var result = PlcJsonConverter.ApplyJson(new DynamicValueNode(target),
+            var plan = PlcLeafPlanner.Plan(new DynamicValueNode(new byte[] {0, 0}),
                 JArray.Parse("[7, 200]"), "PersistentVars.Positions");
 
-            Assert.True(result.IsClean);
-            Assert.Equal(new byte[] {7, 200}, target);
+            Assert.True(plan.IsClean);
+            Assert.Equal(new object[] {(byte) 7, (byte) 200}, plan.Writes.Select(w => w.Value));
         }
 
         [Fact]
         public void A_value_that_does_not_fit_the_element_type_is_reported()
         {
-            var target = new byte[] {0, 0};
-
-            var result = PlcJsonConverter.ApplyJson(new DynamicValueNode(target),
+            var plan = PlcLeafPlanner.Plan(new DynamicValueNode(new byte[] {0, 0}),
                 JArray.Parse("[7, 5000]"), "PersistentVars.Positions");
 
-            Assert.False(result.IsClean);
-            Assert.Contains(result.Mismatches, m => m.Contains("PersistentVars.Positions[1]"));
-            Assert.Equal(7, target[0]);
+            Assert.False(plan.IsClean);
+            Assert.Contains(plan.Mismatches, m => m.Contains("PersistentVars.Positions[1]"));
+            Assert.Equal((byte) 7, Assert.Single(plan.Writes).Value);
         }
 
         [Fact]
         public void An_array_that_changed_length_is_reported()
         {
-            var target = new[] {false, false, false};
-
-            var result = PlcJsonConverter.ApplyJson(new DynamicValueNode(target),
+            var plan = PlcLeafPlanner.Plan(new DynamicValueNode(new[] {false, false, false}),
                 JArray.Parse("[true, true]"), "PersistentVars.Alarms");
 
-            Assert.False(result.IsClean);
-            Assert.Contains(result.Mismatches, m => m.Contains("array length differs"));
-            Assert.Equal(new[] {true, true, false}, target);
+            Assert.False(plan.IsClean);
+            Assert.Contains(plan.Mismatches, m => m.Contains("array length differs"));
+            Assert.Equal(2, plan.Writes.Count);
         }
 
         /// <summary>
@@ -161,19 +155,20 @@ namespace TwinCatAdsTool.Logic.Tests
                 return false;
             }
             public object Value { get; }
+            public object NativeValue => Value;
+            public int ArrayLowerBound => 0;
         }
 
         [Fact]
-        public void A_round_trip_through_json_leaves_an_array_unchanged()
+        public void A_round_trip_through_json_gives_the_values_back_unchanged()
         {
             var source = new byte[] {1, 42, 255};
             var json = PlcJsonConverter.ToJson(new DynamicValueNode(source));
 
-            var target = new byte[] {0, 0, 0};
-            var result = PlcJsonConverter.ApplyJson(new DynamicValueNode(target), json, "PersistentVars.Data");
+            var plan = PlcLeafPlanner.Plan(new DynamicValueNode(new byte[] {0, 0, 0}), json, "PersistentVars.Data");
 
-            Assert.True(result.IsClean);
-            Assert.Equal(source, target);
+            Assert.True(plan.IsClean);
+            Assert.Equal(source.Cast<object>(), plan.Writes.Select(w => w.Value));
         }
     }
 }

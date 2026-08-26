@@ -15,11 +15,11 @@ namespace TwinCatAdsTool.Logic.Services
 {
     public class PersistentVariableService : IPersistentVariableService
     {
-        private readonly Subject<string> currentTaskSubject = new Subject<string>();
+        private readonly Subject<OperationProgress> currentTaskSubject = new Subject<OperationProgress>();
         private readonly PersistentVariableReader reader = new PersistentVariableReader();
         private readonly PersistentVariableWriter writer = new PersistentVariableWriter();
 
-        public IObservable<string> CurrentTask => currentTaskSubject.AsObservable();
+        public IObservable<OperationProgress> CurrentTask => currentTaskSubject.AsObservable();
 
         public Task<PersistentBackup> ReadPersistentVariables(AdsClient client,
             IEnumerable<ISymbol> symbols,
@@ -39,6 +39,7 @@ namespace TwinCatAdsTool.Logic.Services
             return backup.Data;
         }
 
-        private IProgress<string> Progress() => new Progress<string>(task => currentTaskSubject.OnNext(task));
+        private IProgress<OperationProgress> Progress()
+            => new Progress<OperationProgress>(task => currentTaskSubject.OnNext(task));
     }
 }

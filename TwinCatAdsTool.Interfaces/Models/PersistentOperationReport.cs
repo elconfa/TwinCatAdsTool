@@ -30,17 +30,24 @@ namespace TwinCatAdsTool.Interfaces.Models
         public int FailedCount => Failed.Count;
         public int SkippedCount => SkippedVariables.Count;
 
+        /// <summary>Everything that did not succeed, failures before skips.</summary>
+        public IEnumerable<VariableOperationResult> Problems()
+            => Failed.Concat(SkippedVariables);
+
         /// <summary>True when every variable was processed successfully.</summary>
         public bool IsComplete => FailedCount == 0 && SkippedCount == 0;
 
         public string Summary => $"{SucceededCount} ok, {FailedCount} failed, {SkippedCount} skipped " +
                                  $"in {Duration.TotalSeconds:F1} s";
 
-        /// <summary>Multi line report listing every variable that did not succeed.</summary>
+        /// <summary>
+        /// Every variable that did not succeed, failures first. A run that skips many variables
+        /// because the backup does not cover them would otherwise bury the handful that actually
+        /// went wrong, which are the ones worth reading.
+        /// </summary>
         public string Details()
         {
-            var problems = Results
-                .Where(r => r.State != VariableOperationState.Succeeded)
+            var problems = Problems()
                 .Select(r => r.ToString())
                 .ToList();
 

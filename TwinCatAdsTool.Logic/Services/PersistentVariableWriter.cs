@@ -25,6 +25,15 @@ namespace TwinCatAdsTool.Logic.Services
     public class PersistentVariableWriter
     {
         private const int MaxSymbolsPerBatch = 100;
+
+        /// <summary>
+        /// Leaves are addressed one by one, so there are far more of them than there are
+        /// persistent variables, and each one carries only a handful of bytes. Grouping more of
+        /// them into a single sum command keeps the number of ads round trips down;
+        /// <see cref="MaxBytesPerBatch"/> still caps what a single command may carry.
+        /// </summary>
+        private const int MaxLeavesPerBatch = 500;
+
         private const int MaxBytesPerBatch = 256 * 1024;
 
         private readonly ILog logger = LoggerFactory.GetLogger();
@@ -33,7 +42,7 @@ namespace TwinCatAdsTool.Logic.Services
         public async Task<PersistentOperationReport> WriteAsync(IAdsConnection connection,
             IEnumerable<ISymbol> symbols,
             JObject backup,
-            IProgress<string> progress,
+            IProgress<OperationProgress> progress,
             CancellationToken cancel)
         {
             var stopwatch = Stopwatch.StartNew();
@@ -58,17 +67,20 @@ namespace TwinCatAdsTool.Logic.Services
             results.AddRange(FindOrphans(backup, scan.Roots));
 
             var done = 0;
-            foreach (var batch in Batch(matched))
+            foreach (var batch in Batch(matched, MaxSymbolsPerBatch, SizeOf))
             {
                 cancel.ThrowIfCancellationRequested();
-                progress?.Report($"Writing {done + 1}-{done + batch.Count} of {matched.Count} persistent variables...");
+                progress?.Report(new OperationProgress(
+                    $"Writing {done + 1}-{done + batch.Count} of {matched.Count} persistent variables...",
+                    done,
+                    matched.Count));
 
                 await WriteBatchAsync(connection, batch, backup, results, cancel).ConfigureAwait(false);
                 done += batch.Count;
             }
 
             stopwatch.Stop();
-            progress?.Report(string.Empty);
+            progress?.Report(OperationProgress.Idle);
 
             var report = new PersistentOperationReport(results, stopwatch.Elapsed);
             logger.Info($"Restore finished: {report.Summary}");
@@ -76,16 +88,17 @@ namespace TwinCatAdsTool.Logic.Services
             return report;
         }
 
+        /// <summary>
+        /// Reads every variable of the batch to learn its declared types, works out which
+        /// individual leaves the backup wants written, and writes those leaves.
+        /// </summary>
         private async Task WriteBatchAsync(IAdsConnection connection,
             IReadOnlyList<ISymbol> batch,
             JObject backup,
             List<VariableOperationResult> results,
             CancellationToken cancel)
         {
-            // The current value tree is needed to know the declared type of every member before
-            // the json values can be coerced into it.
-            var values = new object[batch.Count];
-            var writable = new List<int>();
+            var plans = new List<RootPlan>();
 
             for (var i = 0; i < batch.Count; i++)
             {
@@ -100,47 +113,40 @@ namespace TwinCatAdsTool.Logic.Services
                         continue;
                     }
 
-                    var current = await valueSymbol.ReadValueAsync(cancel).ConfigureAwait(false);
-                    var node = new DynamicValueNode(current);
+                    // ReadValueAsync hands back a result object, not the value itself. Passing
+                    // the wrapper on made DynamicValueNode find neither members nor elements, so
+                    // every structure and array looked like a scalar and the restore reported
+                    // "backup value does not fit the plc type" for all of them.
+                    var read = await valueSymbol.ReadValueAsync(cancel).ConfigureAwait(false);
+                    if (!read.Succeeded)
+                    {
+                        results.Add(VariableOperationResult.Failure(symbol.InstancePath,
+                            $"could not read the current value - ads error {(AdsErrorCode) read.ErrorCode}"));
+                        continue;
+                    }
+
+                    // The value that was just read is only consulted, never modified: it says
+                    // which type every leaf holds so the json can be converted into it.
+                    var node = new DynamicValueNode(read.Value);
                     var json = JsonPathBuilder.Find(backup, symbol.InstancePath);
+                    var plan = PlcLeafPlanner.Plan(node, json, symbol.InstancePath);
 
-                    if (!node.IsArray && !node.IsStruct)
+                    var rootPlan = new RootPlan(symbol);
+                    rootPlan.Problems.AddRange(plan.Mismatches);
+
+                    foreach (var write in plan.Writes)
                     {
-                        // A scalar variable is written directly from its json value.
-                        if (!TryWriteScalar(valueSymbol, current, json, symbol.InstancePath, results))
+                        if (TryResolveLeaf(symbol, write, out var leaf, out var reason))
                         {
-                            continue;
+                            rootPlan.Leaves.Add(new LeafTarget(leaf, write));
                         }
-
-                        results.Add(VariableOperationResult.Success(symbol.InstancePath));
-                        continue;
-                    }
-
-                    var applied = PlcJsonConverter.ApplyJson(node, json, symbol.InstancePath);
-
-                    if (!applied.IsClean)
-                    {
-                        foreach (var mismatch in applied.Mismatches)
+                        else
                         {
-                            logger.Warn($"Restore mismatch: {mismatch}");
+                            rootPlan.Problems.Add($"{write.Path}: {reason}");
                         }
                     }
 
-                    if (applied.AppliedCount == 0)
-                    {
-                        results.Add(VariableOperationResult.Failure(symbol.InstancePath,
-                            $"nothing could be written - {FirstReasons(applied)}"));
-                        continue;
-                    }
-
-                    values[i] = current;
-                    writable.Add(i);
-
-                    if (!applied.IsClean)
-                    {
-                        results.Add(VariableOperationResult.Failure(symbol.InstancePath,
-                            $"written partially - {FirstReasons(applied)}"));
-                    }
+                    plans.Add(rootPlan);
                 }
                 catch (Exception e)
                 {
@@ -149,109 +155,214 @@ namespace TwinCatAdsTool.Logic.Services
                 }
             }
 
-            if (!writable.Any())
+            foreach (var problem in plans.SelectMany(p => p.Problems))
             {
-                return;
+                logger.Warn($"Restore mismatch: {problem}");
             }
 
-            var symbolsToWrite = writable.Select(i => batch[i]).ToList();
-            var valuesToWrite = writable.Select(i => values[i]).ToArray();
-            var failedIndexes = new HashSet<int>();
+            await WriteLeavesAsync(connection, plans.SelectMany(p => p.Leaves).ToList(), cancel).ConfigureAwait(false);
 
+            results.AddRange(plans.Select(Describe));
+        }
+
+        /// <summary>
+        /// Walks from a persistent variable down to the symbol that owns a single value.
+        ///
+        /// This is what makes a nested value arrive on the plc at all: the write goes to the leaf
+        /// symbol itself, so nothing depends on the ads library carrying a change back up through
+        /// the structure it was read into.
+        /// </summary>
+        private static bool TryResolveLeaf(ISymbol root, PlcLeafWrite write, out IValueSymbol leaf, out string reason)
+        {
+            leaf = null;
+            reason = null;
+
+            var current = root;
+
+            foreach (var step in write.Steps)
+            {
+                var children = SubSymbolsOf(current);
+
+                if (step.IsElement)
+                {
+                    // Elements are addressed by position rather than by declared index: the plc
+                    // enumerates them in the same order the value tree does, whatever the lower
+                    // bound is and however many dimensions the array has.
+                    if (step.ElementPosition < 0 || step.ElementPosition >= children.Count)
+                    {
+                        reason = $"the plc reports {children.Count} elements under '{current.InstancePath}'";
+                        return false;
+                    }
+
+                    current = children[step.ElementPosition];
+                    continue;
+                }
+
+                var member = FindMember(children, current, step.MemberName);
+                if (member == null)
+                {
+                    reason = $"'{step.MemberName}' is not a member of '{current.InstancePath}' on the plc";
+                    return false;
+                }
+
+                current = member;
+            }
+
+            if (current.IsReadOnly)
+            {
+                reason = "the plc declares it read only";
+                return false;
+            }
+
+            leaf = current as IValueSymbol;
+            if (leaf == null)
+            {
+                reason = "the symbol carries no writable value";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static ISymbol FindMember(IList<ISymbol> children, ISymbol parent, string name)
+        {
+            if (children is ISymbolCollection<ISymbol> collection &&
+                collection.TryGetInstance($"{parent.InstancePath}.{name}", out var found))
+            {
+                return found;
+            }
+
+            return children.FirstOrDefault(c => string.Equals(c.InstanceName, name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static IList<ISymbol> SubSymbolsOf(ISymbol symbol)
+        {
             try
             {
-                var sum = new SumSymbolWrite(connection, symbolsToWrite);
-                var code = sum.TryWrite(valuesToWrite, out var returnCodes);
+                return (IList<ISymbol>) symbol.SubSymbols ?? Array.Empty<ISymbol>();
+            }
+            catch (Exception)
+            {
+                // Some symbol kinds throw instead of returning an empty collection.
+                return Array.Empty<ISymbol>();
+            }
+        }
+
+        private async Task WriteLeavesAsync(IAdsConnection connection, IReadOnlyList<LeafTarget> leaves,
+            CancellationToken cancel)
+        {
+            foreach (var chunk in Batch(leaves, MaxLeavesPerBatch, leaf => SizeOf(leaf.Symbol)))
+            {
+                cancel.ThrowIfCancellationRequested();
+                await WriteLeafChunkAsync(connection, chunk, cancel).ConfigureAwait(false);
+            }
+        }
+
+        private async Task WriteLeafChunkAsync(IAdsConnection connection, IReadOnlyList<LeafTarget> chunk,
+            CancellationToken cancel)
+        {
+            try
+            {
+                var sum = new SumSymbolWrite(connection, chunk.Select(leaf => (ISymbol) leaf.Symbol).ToList());
+                var code = sum.TryWrite(chunk.Select(leaf => leaf.Value).ToArray(), out var returnCodes);
 
                 if (code == AdsErrorCode.NoError)
                 {
-                    for (var i = 0; i < symbolsToWrite.Count; i++)
+                    for (var i = 0; i < chunk.Count; i++)
                     {
                         if (returnCodes != null && i < returnCodes.Length && returnCodes[i] != AdsErrorCode.NoError)
                         {
-                            results.Add(VariableOperationResult.Failure(symbolsToWrite[i].InstancePath,
-                                $"ads error {returnCodes[i]}"));
-                            failedIndexes.Add(i);
+                            chunk[i].Failed($"ads error {returnCodes[i]}");
                         }
                     }
 
-                    ReportWritten(symbolsToWrite, failedIndexes, results);
                     return;
                 }
 
-                logger.Warn($"Sum write of {symbolsToWrite.Count} symbols failed with {code}, falling back to single writes");
+                logger.Warn($"Sum write of {chunk.Count} values failed with {code}, falling back to single writes");
             }
             catch (Exception e)
             {
-                logger.Warn($"Sum write of {symbolsToWrite.Count} symbols is not usable, falling back to single writes", e);
+                logger.Warn($"Sum write of {chunk.Count} values is not usable, falling back to single writes", e);
             }
 
-            for (var i = 0; i < symbolsToWrite.Count; i++)
+            foreach (var leaf in chunk)
             {
                 cancel.ThrowIfCancellationRequested();
 
                 try
                 {
-                    await ((IValueSymbol) symbolsToWrite[i]).WriteValueAsync(valuesToWrite[i], cancel).ConfigureAwait(false);
+                    // The write reports failure through its result, not by throwing: ignoring it
+                    // would let a refused write be counted as a successful one.
+                    var written = await leaf.Symbol.WriteValueAsync(leaf.Value, cancel).ConfigureAwait(false);
+
+                    if (!written.Succeeded)
+                    {
+                        leaf.Failed($"ads error {(AdsErrorCode) written.ErrorCode}");
+                    }
                 }
                 catch (Exception e)
                 {
-                    logger.Error($"Could not write '{symbolsToWrite[i].InstancePath}'", e);
-                    results.Add(VariableOperationResult.Failure(symbolsToWrite[i].InstancePath, e));
-                    failedIndexes.Add(i);
+                    logger.Error($"Could not write '{leaf.Path}'", e);
+                    leaf.Failed(e.Message);
                 }
             }
-
-            ReportWritten(symbolsToWrite, failedIndexes, results);
         }
 
-        private static void ReportWritten(IReadOnlyList<ISymbol> symbols, ICollection<int> failedIndexes,
-            List<VariableOperationResult> results)
+        private static VariableOperationResult Describe(RootPlan plan)
         {
-            for (var i = 0; i < symbols.Count; i++)
+            var refused = plan.Leaves.Where(leaf => leaf.Error != null).ToList();
+            var problems = plan.Problems
+                .Concat(refused.Select(leaf => $"{leaf.Path}: {leaf.Error}"))
+                .ToList();
+
+            if (problems.Count == 0)
             {
-                if (failedIndexes.Contains(i))
-                {
-                    continue;
-                }
-
-                var path = symbols[i].InstancePath;
-
-                // A partial write was already reported while the value tree was being filled.
-                if (results.Any(r => r.InstancePath == path && r.State == VariableOperationState.Failed))
-                {
-                    continue;
-                }
-
-                results.Add(VariableOperationResult.Success(path));
+                return VariableOperationResult.Success(plan.Root.InstancePath);
             }
+
+            var written = plan.Leaves.Count - refused.Count;
+
+            return VariableOperationResult.Failure(plan.Root.InstancePath,
+                written == 0
+                    ? $"nothing could be written - {FirstReasons(problems)}"
+                    : $"written partially - {FirstReasons(problems)}");
         }
 
-        private bool TryWriteScalar(IValueSymbol symbol, object current, JToken json, string path,
-            List<VariableOperationResult> results)
+        /// <summary>Everything one persistent variable needs written, and what went wrong with it.</summary>
+        private class RootPlan
         {
-            var managed = PlcJsonConverter.ToManaged(json);
-
-            if (!ValueCoercion.TryCoerce(managed, ValueCoercion.Normalize(current), out var coerced) ||
-                !ValueCoercion.TryCoerce(coerced, current, out var wrapped))
+            public RootPlan(ISymbol root)
             {
-                results.Add(VariableOperationResult.Failure(path,
-                    $"backup value '{managed}' does not fit the plc type"));
-                return false;
+                Root = root;
             }
 
-            try
-            {
-                symbol.WriteValue(wrapped);
-                return true;
-            }
-            catch (Exception e)
-            {
-                logger.Error($"Could not write '{path}'", e);
-                results.Add(VariableOperationResult.Failure(path, e));
-                return false;
-            }
+            public ISymbol Root { get; }
+            public List<LeafTarget> Leaves { get; } = new List<LeafTarget>();
+
+            /// <summary>Reasons a value never made it as far as being written.</summary>
+            public List<string> Problems { get; } = new List<string>();
         }
+
+        private class LeafTarget
+        {
+            public LeafTarget(IValueSymbol symbol, PlcLeafWrite write)
+            {
+                Symbol = symbol;
+                Value = write.Value;
+                Path = write.Path;
+            }
+
+            public IValueSymbol Symbol { get; }
+            public object Value { get; }
+            public string Path { get; }
+
+            /// <summary>Null while the write is still considered successful.</summary>
+            public string Error { get; private set; }
+
+            public void Failed(string error) => Error = error;
+        }
+
 
         /// <summary>
         /// Finds entries of the backup file that do not correspond to any persistent variable on
@@ -304,35 +415,35 @@ namespace TwinCatAdsTool.Logic.Services
             }
         }
 
-        private static string FirstReasons(ValueApplyResult applied)
+        private static string FirstReasons(IReadOnlyList<string> problems)
         {
             const int maxReasons = 3;
-            var reasons = applied.Mismatches.Take(maxReasons).ToList();
-            var more = applied.Mismatches.Count - reasons.Count;
+            var reasons = problems.Take(maxReasons).ToList();
+            var more = problems.Count - reasons.Count;
 
             return more > 0
                 ? $"{string.Join("; ", reasons)} (and {more} more)"
                 : string.Join("; ", reasons);
         }
 
-        private static IEnumerable<IReadOnlyList<ISymbol>> Batch(IReadOnlyList<ISymbol> symbols)
+        private static IEnumerable<IReadOnlyList<T>> Batch<T>(IReadOnlyList<T> items, int maxCount, Func<T, int> sizeOf)
         {
-            var current = new List<ISymbol>();
+            var current = new List<T>();
             var currentBytes = 0;
 
-            foreach (var symbol in symbols)
+            foreach (var item in items)
             {
-                var size = SizeOf(symbol);
+                var size = sizeOf(item);
 
                 if (current.Count > 0 &&
-                    (current.Count >= MaxSymbolsPerBatch || currentBytes + size > MaxBytesPerBatch))
+                    (current.Count >= maxCount || currentBytes + size > MaxBytesPerBatch))
                 {
                     yield return current;
-                    current = new List<ISymbol>();
+                    current = new List<T>();
                     currentBytes = 0;
                 }
 
-                current.Add(symbol);
+                current.Add(item);
                 currentBytes += size;
             }
 

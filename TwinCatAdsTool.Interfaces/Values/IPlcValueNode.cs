@@ -6,7 +6,7 @@ namespace TwinCatAdsTool.Interfaces.Values
     /// A node of an already-read plc value tree: a struct, an array or a leaf.
     /// Navigating this tree must never cause ads traffic - the whole value is expected to have
     /// been transferred in a single read beforehand. Keeping this behind an interface lets the
-    /// json conversion be unit tested without a plc.
+    /// json conversion and the restore plan be unit tested without a plc.
     /// </summary>
     public interface IPlcValueNode
     {
@@ -23,24 +23,16 @@ namespace TwinCatAdsTool.Interfaces.Values
 
         /// <summary>The managed value of a leaf node. Only meaningful when the node is neither array nor struct.</summary>
         object Value { get; }
-    }
 
-    /// <summary>
-    /// A plc value tree that can be modified in memory before being flushed back to the plc
-    /// with a single write.
-    /// </summary>
-    public interface IMutablePlcValueNode : IPlcValueNode
-    {
-        bool TrySetMember(string name, object value);
-        bool TrySetElement(int index, object value);
+        /// <summary>
+        /// The same leaf as the plc library itself represents it, with the PlcOpen wrapper types
+        /// still in place. <see cref="Value"/> unwraps a DT into a DateTime and a TIME into a
+        /// TimeSpan, which is what belongs in a backup file; writing one back needs the wrapper
+        /// again, and this is the template that says which one.
+        /// </summary>
+        object NativeValue { get; }
 
         /// <summary>Lower bound of the first array dimension - plc arrays are rarely zero based.</summary>
         int ArrayLowerBound { get; }
-
-        /// <summary>Number of elements of an array node.</summary>
-        int ArrayLength { get; }
-
-        bool TryGetMutableMember(string name, out IMutablePlcValueNode member);
-        bool TryGetMutableElement(int index, out IMutablePlcValueNode element);
     }
 }

@@ -11,7 +11,7 @@ namespace TwinCatAdsTool.Logic.Values
     /// of a whole symbol. Every member access below stays in memory - no ads round trip is
     /// triggered while walking the tree, which is the whole point of reading the symbol in one go.
     /// </summary>
-    public class DynamicValueNode : IMutablePlcValueNode
+    public class DynamicValueNode : IPlcValueNode
     {
         private readonly object value;
         private IReadOnlyList<string> memberNames;
@@ -72,6 +72,8 @@ namespace TwinCatAdsTool.Logic.Values
 
         public object Value => ValueCoercion.Normalize(value);
 
+        public object NativeValue => value;
+
         public int ArrayLowerBound
         {
             get
@@ -89,28 +91,7 @@ namespace TwinCatAdsTool.Logic.Values
             }
         }
 
-        public int ArrayLength
-        {
-            get
-            {
-                var native = NativeArray;
-                if (native != null)
-                {
-                    return native.Length;
-                }
-
-                return (Dynamic?.DataType as IArrayType)?.Dimensions?.ElementCount ?? 0;
-            }
-        }
-
         public bool TryGetMember(string name, out IPlcValueNode member)
-        {
-            var found = TryGetMutableMember(name, out var mutable);
-            member = mutable;
-            return found;
-        }
-
-        public bool TryGetMutableMember(string name, out IMutablePlcValueNode member)
         {
             member = null;
 
@@ -123,85 +104,5 @@ namespace TwinCatAdsTool.Logic.Values
             member = new DynamicValueNode(memberValue);
             return true;
         }
-
-        public bool TryGetMutableElement(int index, out IMutablePlcValueNode element)
-        {
-            element = null;
-
-            var native = NativeArray;
-            if (native != null)
-            {
-                try
-                {
-                    element = new DynamicValueNode(native.GetValue(index));
-                    return true;
-                }
-                catch (Exception)
-                {
-                    // Out of range, or an array of more than one dimension.
-                    return false;
-                }
-            }
-
-            var dynamicValue = Dynamic;
-            if (dynamicValue == null || !dynamicValue.TryGetIndexValue(new[] {index}, out var elementValue))
-            {
-                return false;
-            }
-
-            element = new DynamicValueNode(elementValue);
-            return true;
-        }
-
-        public bool TrySetMember(string name, object newValue)
-        {
-            var dynamicValue = Dynamic;
-            if (dynamicValue == null || !dynamicValue.TryGetMemberValue(name, out var current))
-            {
-                return false;
-            }
-
-            return ValueCoercion.TryCoerce(newValue, ValueCoercion.Normalize(current), out var coerced) &&
-                   dynamicValue.TrySetMemberValue(name, Denormalize(coerced, current));
-        }
-
-        public bool TrySetElement(int index, object newValue)
-        {
-            var native = NativeArray;
-            if (native != null)
-            {
-                try
-                {
-                    var element = native.GetValue(index);
-                    if (!ValueCoercion.TryCoerce(newValue, ValueCoercion.Normalize(element), out var converted))
-                    {
-                        return false;
-                    }
-
-                    native.SetValue(Denormalize(converted, element), index);
-                    return true;
-                }
-                catch (Exception)
-                {
-                    return false;
-                }
-            }
-
-            var dynamicValue = Dynamic;
-            if (dynamicValue == null || !dynamicValue.TryGetIndexValue(new[] {index}, out var current))
-            {
-                return false;
-            }
-
-            return ValueCoercion.TryCoerce(newValue, ValueCoercion.Normalize(current), out var coerced) &&
-                   dynamicValue.TrySetIndexValue(new object[] {index}, Denormalize(coerced, current));
-        }
-
-        /// <summary>
-        /// <see cref="ValueCoercion.TryCoerce"/> works against the normalized value, so a PlcOpen
-        /// member comes back as DateTime or TimeSpan and has to be wrapped again before writing.
-        /// </summary>
-        private static object Denormalize(object coerced, object current)
-            => ValueCoercion.TryCoerce(coerced, current, out var wrapped) ? wrapped : coerced;
     }
 }

@@ -1,15 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using TwinCatAdsTool.Interfaces.Values;
 
 namespace TwinCatAdsTool.Logic.Tests
 {
     /// <summary>
-    /// In-memory stand-in for a plc value tree, so the json conversion can be tested without
-    /// a plc or the ads library.
+    /// In-memory stand-in for a plc value tree, so the json conversion and the restore plan can
+    /// be tested without a plc or the ads library.
     /// </summary>
-    public class FakeValueNode : IMutablePlcValueNode
+    public class FakeValueNode : IPlcValueNode
     {
         private readonly List<string> memberOrder = new List<string>();
         private readonly Dictionary<string, FakeValueNode> members = new Dictionary<string, FakeValueNode>(StringComparer.OrdinalIgnoreCase);
@@ -54,8 +53,11 @@ namespace TwinCatAdsTool.Logic.Tests
         public IEnumerable<IPlcValueNode> Elements => elements;
         public IEnumerable<string> MemberNames => memberOrder;
         public object Value { get; private set; }
+
+        // Nothing here wraps a value the way the PlcOpen types do, so both views are the same.
+        public object NativeValue => Value;
+
         public int ArrayLowerBound { get; private set; }
-        public int ArrayLength => elements.Count;
 
         public bool TryGetMember(string name, out IPlcValueNode member)
         {
@@ -64,64 +66,6 @@ namespace TwinCatAdsTool.Logic.Tests
             return found;
         }
 
-        public bool TryGetMutableMember(string name, out IMutablePlcValueNode member)
-        {
-            var found = members.TryGetValue(name, out var node);
-            member = node;
-            return found;
-        }
-
-        public bool TryGetMutableElement(int index, out IMutablePlcValueNode element)
-        {
-            element = null;
-            var offset = index - ArrayLowerBound;
-            if (offset < 0 || offset >= elements.Count)
-            {
-                return false;
-            }
-
-            element = elements[offset];
-            return true;
-        }
-
-        public bool TrySetMember(string name, object value)
-            => members.TryGetValue(name, out var node) && Assign(node, value);
-
-        public bool TrySetElement(int index, object value)
-        {
-            var offset = index - ArrayLowerBound;
-            return offset >= 0 && offset < elements.Count && Assign(elements[offset], value);
-        }
-
-        /// <summary>
-        /// Mimics a typed plc variable: the value is converted to the type the variable already
-        /// holds, exactly as <c>DynamicValueNode</c> does through ValueCoercion, and refused when
-        /// no conversion exists.
-        /// </summary>
-        private static bool Assign(FakeValueNode node, object value)
-        {
-            if (node.kind != Kind.Leaf)
-            {
-                return false;
-            }
-
-            if (node.Value != null && value != null && node.Value.GetType() != value.GetType())
-            {
-                try
-                {
-                    value = Convert.ChangeType(value, node.Value.GetType());
-                }
-                catch (Exception)
-                {
-                    return false;
-                }
-            }
-
-            node.Value = value;
-            return true;
-        }
-
         public object MemberValue(string name) => members[name].Value;
-        public object ElementValue(int index) => elements[index - ArrayLowerBound].Value;
     }
 }
