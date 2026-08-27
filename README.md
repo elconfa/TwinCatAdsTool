@@ -4,8 +4,8 @@ A fork of [fbarresi/TwinCatAdsTool](https://github.com/fbarresi/TwinCatAdsTool) 
 you ever wanted and your lite alternative to Visual Studio.
 
 This fork fixes several defects in the persistent variable backup and restore engine, two of which
-could lose data without saying so, turns the live value graph into a scope that can be stopped and
-scrolled through, and modernises the application: .NET 8, ADS 7 (one binary for TwinCAT 4024 and
+could lose data without saying so, adds a command line so a backup can be automated, turns the live
+value graph into a scope that can be stopped and scrolled through, and modernises the application: .NET 8, ADS 7 (one binary for TwinCAT 4024 and
 4026) and a Fluent interface.
 
 Everything below is either measured on a real plant or stated as unverified. Where a claim rests on
@@ -362,6 +362,75 @@ trip back to the project.
 
 ---
 
+## Command line
+
+Everything the backup and restore tabs do can be asked for without opening the window, so a backup
+can be a scheduled task, a step in a deployment, or something the PLC itself starts before an update.
+
+```
+TwinCatAdsTool backup  <netid> <port> <file>
+TwinCatAdsTool restore <netid> <port> <file>
+TwinCatAdsTool compare <netid> <port> <file>
+TwinCatAdsTool --help
+```
+
+It is the same executable and the same engine — there is no second implementation to drift out of
+step with the one the window uses.
+
+```
+TwinCatAdsTool.exe backup 5.24.108.31.1.1 851 D:\backups\plant.json
+```
+
+### What a script can act on
+
+The exit code carries the outcome, because a script has no other way of finding out how the run went.
+The distinctions are the ones a script would treat differently:
+
+| | |
+|---|---|
+| `0` | done, and every variable was processed |
+| `1` | the command line could not be understood |
+| `2` | the PLC could not be reached — worth retrying |
+| `3` | the run finished, but variables failed or were skipped — **not** worth treating as a backup |
+| `4` | something unexpected went wrong |
+| `5` | `compare` only: the PLC and the file differ |
+
+`3` is the one that matters. A backup that could not read everything still writes what it got, and a
+script that only checks whether the file exists would keep it as though it were complete. That is the
+same class of mistake as a restore reporting success without having written anything, which is what
+this fork exists to fix.
+
+`compare` reads the PLC and compares it against a file **leaf by leaf**, not as text: key order,
+formatting and whitespace are properties of the file rather than of the plant, and a textual diff
+reports them as changes. It names each difference by its path — `MAIN.fbAxis.Position`, `GVL.arr[3]`
+— and says which side each value is on. This is what makes a restore verifiable from a script:
+restore, then compare, and let the exit code decide.
+
+An AMS net id is checked before anything connects. A mistyped one would otherwise come back much
+later as a timeout, which reads like a network problem rather than a typing one.
+
+### Two things worth knowing
+
+The application is a Windows program rather than a console one, so `cmd` returns to the prompt while
+it is still running. Use `start /wait`, or PowerShell's `Start-Process -Wait`, when the exit code is
+wanted. Neither matters for a scheduled task or for `NT_StartProcess` called from the PLC.
+
+**A restore writes to the PLC without asking.** That is what a command line is for, and it is worth
+saying out loud.
+
+### Coming from the Symbol Explorer
+
+Beckhoff's [Symbol Explorer](https://infosys.beckhoff.com/content/1033/tf8040_tc3_buildingautomation/9231016331.html),
+part of TF8040 TwinCAT 3 Building Automation, does much of this and more — merging in the compare
+view, regular expressions over the symbol list, integration with the XAE Shell. If you have TF8040,
+you already have it, and for managing snapshots it is the better tool.
+
+`--SnapShotFromPlc`, `--SyncPlcToSnapShot` and `--SyncSnapShotToPlc` are accepted here as spellings of
+`backup`, `backup` and `restore`, so a script written against it can be pointed at this without being
+rewritten.
+
+---
+
 ## Modernisation
 
 ### .NET 8
@@ -427,11 +496,14 @@ Details, and the parts that are deliberately unchanged, in [docs/UI-FLUENT.md](d
 restore of 10,978 leaves in 2.5 s with every leaf correct; nested branches, arrays of structures,
 arrays inside structures inside arrays, strings, REALs, BOOLs, TIME, LTIME and DT.
 
-**Verified by test**: 113 unit tests, run on every build. Thirty-five of them cover the scope: the
-recording buffer and the sample that has to be carried in from before the window, the table a capture
-is exported as, and the trigger conditions.
+**Verified by test**: 154 unit tests, run on every build. Thirty-five cover the scope — the recording
+buffer and the sample that has to be carried in from before the window, the table a capture is
+exported as, the trigger conditions — and forty-one cover the command line: what it accepts and
+refuses, and the leaf by leaf comparison behind `compare`.
 
-**Not verified**: the accuracy of scope timings below roughly ten milliseconds — the samples are
+**Not verified**: the command line against a real PLC. Its parsing and its comparison are covered by
+tests, and it drives the same engine the window drives, but nobody has yet run `backup` from a
+scheduled task on a live controller. And the accuracy of scope timings below roughly ten milliseconds — the samples are
 stamped when they reach the pc, not when the PLC changed them, so short events are ordered correctly
 but not measured. And multidimensional arrays (`ARRAY[0..n,0..m]`), which the plant used for the
 verification does not contain. The write path addresses elements by position and can no longer

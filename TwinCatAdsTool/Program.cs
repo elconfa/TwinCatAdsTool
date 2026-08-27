@@ -15,7 +15,9 @@ using TwinCatAdsTool.Gui.Views;
 using TwinCatAdsTool.Interfaces;
 using TwinCatAdsTool.Interfaces.Commons;
 using TwinCatAdsTool.Interfaces.Logging;
+using TwinCatAdsTool.Cli;
 using TwinCatAdsTool.Logic;
+using TwinCatAdsTool.Logic.Cli;
 
 namespace TwinCatAdsTool
 {
@@ -24,8 +26,59 @@ namespace TwinCatAdsTool
 		[DllImport("kernel32.dll", SetLastError = true)]
 		private static extern bool FreeConsole();
 
+		[DllImport("kernel32.dll", SetLastError = true)]
+		private static extern bool AttachConsole(int processId);
+
+		/// <summary>The console of whatever started this process, if it had one.</summary>
+		private const int ParentProcess = -1;
+
 		[STAThread]
-		public static void Main(string[] args)
+		public static int Main(string[] args)
+		{
+			var command = CommandLine.Parse(args);
+
+			// No arguments means the window, which is what nearly every run is.
+			return command.IsValid && command.Verb == CliVerb.None
+				? RunWindow()
+				: RunCommandLine(command);
+		}
+
+		/// <summary>
+		/// A windows application owns no console, so output would go nowhere. Attaching to the one
+		/// that started the process is what lets it reach the shell that asked; when there is none -
+		/// a scheduled task, or NT_StartProcess called from the plc - the writes are simply dropped,
+		/// and the exit code carries the outcome instead.
+		/// </summary>
+		private static int RunCommandLine(CliCommand command)
+		{
+			AttachConsole(ParentProcess);
+
+			// The runtime decided at first use that there was no console and cached a writer that
+			// discards everything; the streams have to be opened again now that there is one.
+			Console.SetOut(new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
+			Console.SetError(new StreamWriter(Console.OpenStandardError()) { AutoFlush = true });
+
+			using (IKernel kernel = new StandardKernel())
+			{
+				try
+				{
+					CreateLogger();
+
+					// Only the engine. The interface bindings would drag in a graph that has no
+					// business being built for a command that writes a file and exits.
+					kernel.Load<LogicModuleCatalog>();
+
+					return CliRunner.Run(command, kernel);
+				}
+				catch (Exception e)
+				{
+					Console.Error.WriteLine($"{e.GetType().Name}: {e.Message}");
+					return ExitCodes.Unexpected;
+				}
+			}
+		}
+
+		private static int RunWindow()
 		{
 			FreeConsole();
 
@@ -58,6 +111,7 @@ namespace TwinCatAdsTool
 					application.Run(mainWindow);
 					application.Shutdown();
 					Log("Application ended...");
+					return 0;
 				}
 				catch (Exception e)
 				{
