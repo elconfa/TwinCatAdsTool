@@ -28,11 +28,19 @@ namespace TwinCatAdsTool.Logic.Services
 
         /// <summary>
         /// Leaves are addressed one by one, so there are far more of them than there are
-        /// persistent variables, and each one carries only a handful of bytes. Grouping more of
-        /// them into a single sum command keeps the number of ads round trips down;
-        /// <see cref="MaxBytesPerBatch"/> still caps what a single command may carry.
+        /// persistent variables, and each one carries only a handful of bytes.
+        ///
+        /// What a restore costs turns out to be set by the number of commands and hardly at all by
+        /// how many values each one carries: on a real plant, twenty-two commands took 6.4 s and
+        /// six took 1.6 s for the same eleven thousand values. So the ceiling is deliberately high
+        /// and <see cref="MaxBytesPerBatch"/> is the bound that actually decides. A command the plc
+        /// refuses is halved and retried rather than abandoned, which is what makes a high ceiling
+        /// safe on a controller with tighter limits than this one.
         /// </summary>
-        private const int MaxLeavesPerBatch = 500;
+        private const int MaxLeavesPerBatch = 10000;
+
+        /// <summary>Below this, halving again buys less than the extra round trip costs.</summary>
+        private const int SmallestChunk = 50;
 
         private const int MaxBytesPerBatch = 256 * 1024;
 
@@ -47,8 +55,10 @@ namespace TwinCatAdsTool.Logic.Services
         {
             var stopwatch = Stopwatch.StartNew();
             var results = new List<VariableOperationResult>();
+            var phases = new Phases();
 
             var scan = scanner.Scan(symbols);
+            phases.Scan = stopwatch.Elapsed;
             results.AddRange(scan.Skipped);
 
             var matched = new List<ISymbol>();
@@ -75,7 +85,7 @@ namespace TwinCatAdsTool.Logic.Services
                     done,
                     matched.Count));
 
-                await WriteBatchAsync(connection, batch, backup, results, cancel).ConfigureAwait(false);
+                await WriteBatchAsync(connection, batch, backup, results, phases, cancel).ConfigureAwait(false);
                 done += batch.Count;
             }
 
@@ -84,6 +94,7 @@ namespace TwinCatAdsTool.Logic.Services
 
             var report = new PersistentOperationReport(results, stopwatch.Elapsed);
             logger.Info($"Restore finished: {report.Summary}");
+            logger.Info($"Restore timing: {phases}");
 
             return report;
         }
@@ -96,47 +107,52 @@ namespace TwinCatAdsTool.Logic.Services
             IReadOnlyList<ISymbol> batch,
             JObject backup,
             List<VariableOperationResult> results,
+            Phases phases,
             CancellationToken cancel)
         {
             var plans = new List<RootPlan>();
+            var clock = Stopwatch.StartNew();
+
+            // One sum command for the whole batch rather than a read per variable. The values are
+            // only consulted - they say which type every leaf holds so the json can be converted
+            // into it - but reading them one at a time cost an ads round trip per persistent
+            // variable, and on a controller that answers slowly, or one that is busy running a
+            // program, that dominated the whole restore. The backup has always read this way.
+            var current = await ReadCurrentValuesAsync(connection, batch, results, cancel).ConfigureAwait(false);
+            phases.Read += Lap(clock);
 
             for (var i = 0; i < batch.Count; i++)
             {
                 cancel.ThrowIfCancellationRequested();
 
                 var symbol = batch[i];
+
+                // Null means the value could not be read; whoever could not read it has already
+                // said why.
+                if (current[i] == null)
+                {
+                    continue;
+                }
+
                 try
                 {
-                    if (!(symbol is IValueSymbol valueSymbol))
-                    {
-                        results.Add(VariableOperationResult.Failure(symbol.InstancePath, "symbol carries no writable value"));
-                        continue;
-                    }
-
-                    // ReadValueAsync hands back a result object, not the value itself. Passing
-                    // the wrapper on made DynamicValueNode find neither members nor elements, so
-                    // every structure and array looked like a scalar and the restore reported
-                    // "backup value does not fit the plc type" for all of them.
-                    var read = await valueSymbol.ReadValueAsync(cancel).ConfigureAwait(false);
-                    if (!read.Succeeded)
-                    {
-                        results.Add(VariableOperationResult.Failure(symbol.InstancePath,
-                            $"could not read the current value - ads error {(AdsErrorCode) read.ErrorCode}"));
-                        continue;
-                    }
-
-                    // The value that was just read is only consulted, never modified: it says
-                    // which type every leaf holds so the json can be converted into it.
-                    var node = new DynamicValueNode(read.Value);
+                    var node = new DynamicValueNode(current[i]);
                     var json = JsonPathBuilder.Find(backup, symbol.InstancePath);
                     var plan = PlcLeafPlanner.Plan(node, json, symbol.InstancePath);
 
                     var rootPlan = new RootPlan(symbol);
                     rootPlan.Problems.AddRange(plan.Mismatches);
 
+                    // Every leaf is reached by walking down from the variable, and the leaves of one
+                    // variable share nearly all of that walk. Remembering the nodes already reached
+                    // turns a descent per leaf into one per node: asking a symbol for its children
+                    // builds that collection afresh each time, so a structure holding an array of a
+                    // hundred elements was having those hundred rebuilt once per leaf underneath it.
+                    var resolved = new Dictionary<string, ISymbol>(StringComparer.Ordinal);
+
                     foreach (var write in plan.Writes)
                     {
-                        if (TryResolveLeaf(symbol, write, out var leaf, out var reason))
+                        if (TryResolveLeaf(symbol, write, resolved, out var leaf, out var reason))
                         {
                             rootPlan.Leaves.Add(new LeafTarget(leaf, write));
                         }
@@ -155,14 +171,167 @@ namespace TwinCatAdsTool.Logic.Services
                 }
             }
 
+            phases.Plan += Lap(clock);
+
             foreach (var problem in plans.SelectMany(p => p.Problems))
             {
                 logger.Warn($"Restore mismatch: {problem}");
             }
 
-            await WriteLeavesAsync(connection, plans.SelectMany(p => p.Leaves).ToList(), cancel).ConfigureAwait(false);
+            await WriteLeavesAsync(connection, plans.SelectMany(p => p.Leaves).ToList(), phases, cancel).ConfigureAwait(false);
 
             results.AddRange(plans.Select(Describe));
+        }
+
+        /// <summary>How long since the last lap, and start counting again.</summary>
+        private static TimeSpan Lap(Stopwatch clock)
+        {
+            var elapsed = clock.Elapsed;
+            clock.Restart();
+            return elapsed;
+        }
+
+        /// <summary>
+        /// Where a restore spent its time. It goes in the log because "the restore is slow" is
+        /// otherwise impossible to act on: reading the current values, working out which leaves to
+        /// write and writing them are three different costs with three different remedies.
+        /// </summary>
+        private class Phases
+        {
+            public TimeSpan Scan { get; set; }
+
+            /// <summary>Reading the current value of each persistent variable.</summary>
+            public TimeSpan Read { get; set; }
+
+            /// <summary>Matching the backup against them and resolving every leaf symbol.</summary>
+            public TimeSpan Plan { get; set; }
+
+            /// <summary>Building the write commands, handles included.</summary>
+            public TimeSpan Prepare { get; set; }
+
+            /// <summary>The write telegrams themselves.</summary>
+            public TimeSpan Transfer { get; set; }
+
+            /// <summary>How many single values were written, and in how many commands. Without both
+            /// numbers the time above cannot be read: the same total means opposite things when it
+            /// is spent per command and when it is spent per value.</summary>
+            public int Leaves { get; set; }
+
+            public int Chunks { get; set; }
+
+            public override string ToString()
+                => $"scan {Scan.TotalSeconds:F2} s, read {Read.TotalSeconds:F2} s, " +
+                   $"plan {Plan.TotalSeconds:F2} s, prepare {Prepare.TotalSeconds:F2} s, " +
+                   $"transfer {Transfer.TotalSeconds:F2} s for {Leaves} values in {Chunks} commands";
+        }
+
+        /// <summary>
+        /// The current value of every variable in the batch, with a null wherever it could not be
+        /// read - the reason having been recorded against that variable.
+        ///
+        /// The reader carries an equivalent of this for the backup. The two are deliberately not
+        /// shared yet: that path is verified against a plant, and unifying them is a change worth
+        /// making on its own rather than inside a fix for something else.
+        /// </summary>
+        private async Task<object[]> ReadCurrentValuesAsync(IAdsConnection connection,
+            IReadOnlyList<ISymbol> batch,
+            List<VariableOperationResult> results,
+            CancellationToken cancel)
+        {
+            var values = new object[batch.Count];
+            var readable = new List<ISymbol>();
+            var positions = new List<int>();
+
+            for (var i = 0; i < batch.Count; i++)
+            {
+                if (batch[i] is IValueSymbol)
+                {
+                    readable.Add(batch[i]);
+                    positions.Add(i);
+                }
+                else
+                {
+                    results.Add(VariableOperationResult.Failure(batch[i].InstancePath, "symbol carries no writable value"));
+                }
+            }
+
+            if (readable.Count == 0)
+            {
+                return values;
+            }
+
+            var pending = new List<int>();
+
+            try
+            {
+                var sum = new SumSymbolRead(connection, readable);
+                var code = sum.TryRead(out var read, out var returnCodes);
+
+                if (code == AdsErrorCode.NoError && read != null)
+                {
+                    for (var i = 0; i < readable.Count; i++)
+                    {
+                        if (returnCodes != null && i < returnCodes.Length && returnCodes[i] != AdsErrorCode.NoError)
+                        {
+                            results.Add(VariableOperationResult.Failure(readable[i].InstancePath,
+                                $"could not read the current value - ads error {returnCodes[i]}"));
+                            continue;
+                        }
+
+                        var value = i < read.Length ? read[i] : null;
+
+                        if (value == null)
+                        {
+                            pending.Add(i);
+                            continue;
+                        }
+
+                        values[positions[i]] = value;
+                    }
+                }
+                else
+                {
+                    logger.Warn($"Sum read of {readable.Count} symbols failed with {code}, falling back to single reads");
+                    pending.AddRange(Enumerable.Range(0, readable.Count));
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Warn($"Sum read of {readable.Count} symbols is not usable, falling back to single reads", e);
+                pending.AddRange(Enumerable.Range(0, readable.Count));
+            }
+
+            // Whatever the sum command could not deliver is read on its own, so that a failure is
+            // attributed to the right variable instead of taking the whole batch down with it.
+            foreach (var i in pending)
+            {
+                cancel.ThrowIfCancellationRequested();
+
+                try
+                {
+                    // ReadValueAsync hands back a result object, not the value itself. Passing the
+                    // wrapper on made DynamicValueNode find neither members nor elements, so every
+                    // structure and array looked like a scalar and the restore reported "backup
+                    // value does not fit the plc type" for all of them.
+                    var read = await ((IValueSymbol) readable[i]).ReadValueAsync(cancel).ConfigureAwait(false);
+
+                    if (read.Succeeded)
+                    {
+                        values[positions[i]] = read.Value;
+                    }
+                    else
+                    {
+                        results.Add(VariableOperationResult.Failure(readable[i].InstancePath,
+                            $"could not read the current value - ads error {(AdsErrorCode) read.ErrorCode}"));
+                    }
+                }
+                catch (Exception e)
+                {
+                    results.Add(VariableOperationResult.Failure(readable[i].InstancePath, e));
+                }
+            }
+
+            return values;
         }
 
         /// <summary>
@@ -172,15 +341,25 @@ namespace TwinCatAdsTool.Logic.Services
         /// symbol itself, so nothing depends on the ads library carrying a change back up through
         /// the structure it was read into.
         /// </summary>
-        private static bool TryResolveLeaf(ISymbol root, PlcLeafWrite write, out IValueSymbol leaf, out string reason)
+        private static bool TryResolveLeaf(ISymbol root, PlcLeafWrite write,
+            Dictionary<string, ISymbol> resolved, out IValueSymbol leaf, out string reason)
         {
             leaf = null;
             reason = null;
 
             var current = root;
+            var key = root.InstancePath;
 
             foreach (var step in write.Steps)
             {
+                key = step.IsElement ? $"{key}[{step.ElementPosition}]" : $"{key}.{step.MemberName}";
+
+                if (resolved.TryGetValue(key, out var already))
+                {
+                    current = already;
+                    continue;
+                }
+
                 var children = SubSymbolsOf(current);
 
                 if (step.IsElement)
@@ -195,6 +374,7 @@ namespace TwinCatAdsTool.Logic.Services
                     }
 
                     current = children[step.ElementPosition];
+                    resolved[key] = current;
                     continue;
                 }
 
@@ -206,6 +386,7 @@ namespace TwinCatAdsTool.Logic.Services
                 }
 
                 current = member;
+                resolved[key] = current;
             }
 
             if (current.IsReadOnly)
@@ -249,22 +430,36 @@ namespace TwinCatAdsTool.Logic.Services
         }
 
         private async Task WriteLeavesAsync(IAdsConnection connection, IReadOnlyList<LeafTarget> leaves,
-            CancellationToken cancel)
+            Phases phases, CancellationToken cancel)
         {
+            phases.Leaves += leaves.Count;
+
             foreach (var chunk in Batch(leaves, MaxLeavesPerBatch, leaf => SizeOf(leaf.Symbol)))
             {
                 cancel.ThrowIfCancellationRequested();
-                await WriteLeafChunkAsync(connection, chunk, cancel).ConfigureAwait(false);
+                await WriteLeafChunkAsync(connection, chunk, phases, cancel).ConfigureAwait(false);
             }
         }
 
         private async Task WriteLeafChunkAsync(IAdsConnection connection, IReadOnlyList<LeafTarget> chunk,
-            CancellationToken cancel)
+            Phases phases, CancellationToken cancel)
         {
+            var clock = Stopwatch.StartNew();
+            phases.Chunks++;
+
             try
             {
+                // Building the command and sending it are timed apart on purpose. The ads library
+                // needs a handle for every symbol it writes by name, and whether it acquires those
+                // one at a time or in one go is not visible from here - but it is the difference
+                // between a telegram per leaf and a telegram per chunk, and the two look the same
+                // from outside unless they are measured separately.
                 var sum = new SumSymbolWrite(connection, chunk.Select(leaf => (ISymbol) leaf.Symbol).ToList());
-                var code = sum.TryWrite(chunk.Select(leaf => leaf.Value).ToArray(), out var returnCodes);
+                var values = chunk.Select(leaf => leaf.Value).ToArray();
+                phases.Prepare += Lap(clock);
+
+                var code = sum.TryWrite(values, out var returnCodes);
+                phases.Transfer += Lap(clock);
 
                 if (code == AdsErrorCode.NoError)
                 {
@@ -279,12 +474,29 @@ namespace TwinCatAdsTool.Logic.Services
                     return;
                 }
 
-                logger.Warn($"Sum write of {chunk.Count} values failed with {code}, falling back to single writes");
+                logger.Warn($"Sum write of {chunk.Count} values failed with {code}");
             }
             catch (Exception e)
             {
-                logger.Warn($"Sum write of {chunk.Count} values is not usable, falling back to single writes", e);
+                phases.Transfer += Lap(clock);
+                logger.Warn($"Sum write of {chunk.Count} values is not usable", e);
             }
+
+            // A refused command is usually refused for being too big for that controller, so it is
+            // halved and tried again. Dropping straight to a write per value would turn one refusal
+            // into thousands of round trips, which is the slowest possible answer to a limit that
+            // could have been met by asking for less at a time.
+            if (chunk.Count > SmallestChunk)
+            {
+                var half = chunk.Count / 2;
+                logger.Warn($"Retrying as two commands of about {half} values");
+
+                await WriteLeafChunkAsync(connection, chunk.Take(half).ToList(), phases, cancel).ConfigureAwait(false);
+                await WriteLeafChunkAsync(connection, chunk.Skip(half).ToList(), phases, cancel).ConfigureAwait(false);
+                return;
+            }
+
+            logger.Warn($"Falling back to single writes for {chunk.Count} values");
 
             foreach (var leaf in chunk)
             {

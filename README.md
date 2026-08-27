@@ -188,6 +188,47 @@ Writing leaf by leaf means more ADS writes than writing whole variables, which w
 objection to the fix. The measurement settles it: 2.5 seconds for a plant with 465 arrays and 833
 structures.
 
+### What a restore actually spends its time on
+
+A restore on a larger plant — 49 variables, **103,234 individual values** — took 11.4 s, which was
+worth understanding rather than accepting. The log now carries the breakdown, so the same question
+can be answered on any plant:
+
+```
+Restore timing: scan 0.04 s, read 0.13 s, plan 1.32 s, prepare 0.00 s, transfer 0.39 s
+                for 103234 values in 12 commands
+```
+
+Three things came out of measuring it, and two of them contradicted what looked obvious:
+
+**The cost of writing is set by the number of commands, not by how many values they carry.** At 500
+values per command the transfer took 6.43 s across about 207 commands; at 10,000 it took 0.39 s
+across 12. That is 31 ms per command in both readings — the payload barely matters. The ceiling is
+now high and the byte limit is what decides, with a refused command halved and retried rather than
+abandoned, so a controller with tighter limits than this one is met by asking for less at a time
+instead of collapsing into a write per value.
+
+**Reading the current values was still one round trip per variable.** The restore reads each
+persistent variable before writing it — not to change it, but because it says which type every leaf
+holds. Those reads now go out as one sum command, the way the backup has always read. It was the
+original defect of this project, *two round trips per leaf*, surviving in a corner of the write path.
+
+**Walking down to a leaf rebuilt the parent's children every time.** Asking a symbol for its
+sub-symbols builds that collection afresh, so a structure holding a hundred-element array had those
+hundred rebuilt once for every leaf underneath it. The nodes already reached are now remembered for
+the length of one variable, which turns a descent per leaf into one per node.
+
+| | before | after |
+|---|---|---|
+| read | 1.0 s | 0.13 s |
+| plan | 3.5 s | 1.32 s |
+| transfer | 6.4 s | 0.39 s |
+| **total** | **11.4 s** | **1.9 s** |
+
+Two things that looked like the answer were not: the ADS handles the write commands need cost 0.00 s,
+and stopping the PLC changed nothing at all. Both were measured before being acted on, which is the
+only reason no time was spent fixing them.
+
 ---
 
 ## Evidence: a full round trip on a real plant
