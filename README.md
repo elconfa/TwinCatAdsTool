@@ -318,6 +318,19 @@ Versions follow the tag the release was built from, and the tag sets the version
 so what the release is called, what the binary reports and what the window shows are the same
 number.
 
+## Reporting a problem
+
+[**Open an issue**](https://github.com/elconfa/TwinCatAdsTool/issues). Bugs and requests for
+something new both belong there; the forms ask for the few things a report cannot be acted on
+without - TwinCAT version, controller, whether the program was running, and for a restore problem
+the shape of the variable involved.
+
+Issues about the original tool rather than about the changes in this fork belong
+[upstream](https://github.com/fbarresi/TwinCatAdsTool/issues).
+
+The most useful report anyone could send is a restore onto a plant that uses **multidimensional
+arrays**, which is the one case listed above as unverified.
+
 ## Requirements
 
 TwinCAT ADS must be installed, and a route to the PLC configured. See

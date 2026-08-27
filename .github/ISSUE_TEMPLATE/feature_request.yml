@@ -1,0 +1,41 @@
+name: Ask for something new
+description: Something the tool does not do, or does more laboriously than it should
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: |
+        The task, not the feature. Knowing what you are working around usually suggests a smaller
+        change than the one being asked for.
+    validations:
+      required: true
+
+  - type: textarea
+    id: today
+    attributes:
+      label: How you do it today
+      description: The manual step, the other tool, or the reason it cannot be done at all.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: Optional. If you already know the shape it should take, describe it.
+
+  - type: dropdown
+    id: format
+    attributes:
+      label: Would this change what a backup file contains?
+      description: |
+        Backup files are read by later versions, so a change of shape is a different kind of
+        decision from a change of behaviour.
+      options:
+        - "No"
+        - "Yes"
+        - Unsure
+    validations:
+      required: true

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: The original project
+    url: https://github.com/fbarresi/TwinCatAdsTool/issues
+    about: For anything about the upstream tool rather than the changes in this fork.
+  - name: How restore was verified
+    url: https://github.com/elconfa/TwinCatAdsTool/blob/upgrade/net8-modern-ui/docs/RESTORE-VERIFICATION.md
+    about: The procedure used to check a restore leaf by leaf, if you want to run it on your own plant.

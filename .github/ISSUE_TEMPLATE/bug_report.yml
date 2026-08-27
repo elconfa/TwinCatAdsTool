@@ -1,0 +1,77 @@
+name: Something does not work
+description: A backup, a restore, a comparison or the application itself behaves wrongly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The fields below are the ones that decide whether a report can be acted on. A restore
+        problem in particular cannot be reproduced without knowing the shape of the variable
+        involved.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, and what the application did instead of what you expected.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: twincat
+    attributes:
+      label: TwinCAT version
+      options:
+        - "4026"
+        - "4024"
+        - Other or unsure
+    validations:
+      required: true
+
+  - type: input
+    id: target
+    attributes:
+      label: Target
+      description: The controller the tool was talking to, and whether it was running or stopped.
+      placeholder: CX5140, program running
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Tool version
+      description: Shown at the top right of the window, beside the logo.
+      placeholder: 1.3.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: build
+    attributes:
+      label: Which build
+      options:
+        - Self contained zip
+        - Framework dependent zip
+        - Built from source
+    validations:
+      required: true
+
+  - type: textarea
+    id: variable
+    attributes:
+      label: The variable involved
+      description: |
+        For a backup or restore problem: its declaration, and the part of the backup file that
+        holds it. Trim it to the branch that misbehaves - the whole file is rarely needed, and
+        plant data does not have to be shared to reproduce a shape.
+      render: text
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        From the `logs` folder beside the executable, or from `%LOCALAPPDATA%\TwinCatAdsTool\logs`
+        if the application could not write beside itself.
+      render: text
