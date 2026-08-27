@@ -15,8 +15,7 @@ a measurement, the numbers are given.
 
 Dark by default, with a light theme a click away — the *Theme* button at the foot of the navigation
 panel switches between the two without a restart, and the choice is remembered. The shot is of the
-backup tab and carries the version badge of 1.3; the scope described below is on the explore tab and
-is not in it.
+backup tab; the explore tab is [further down](#the-explore-tab-is-now-a-scope).
 
 ---
 
@@ -235,6 +234,14 @@ the thing it exists for, and it was structural rather than cosmetic: **one durat
 was kept and what was shown**. Samples were discarded at the moment they left the screen, so going
 back to look at what had just happened was impossible by construction — there was no missing button,
 there were no data.
+
+<img src="docs/images/scope-dark.png" width="860"/>
+
+The scope in a window of its own, stopped and being looked at — **Frozen**, with **Live** offered to
+return to the present. Two `BOOL` signals hold a lane each along the bottom, drawn as steps: the
+narrow green pulse is a single scan, and on a shared linear axis it would have been a spike on a flat
+line at the foot of the plot. `wSecond` runs above them on a scale of its own. One minute is on
+screen out of ten kept, sampled every 10 ms rather than at the ADS default of 200.
 
 Recording and viewing are now two separate spans:
 
