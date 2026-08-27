@@ -181,7 +181,35 @@
                       Background="Transparent" />
 
         <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource ContentSurface}">
-            <ui:DataGrid DataContext="{Binding ObserverViewModel}"
+          <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!--
+                The watched symbols as a set that can be put away and brought back. A file naming
+                the paths outlives the session and can be edited in a text editor, which is what
+                makes it shareable with whoever is on the machine next.
+            -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="12,12,12,4">
+                <ui:Button Command="{Binding CmdLoadWatchSet}"
+                           Appearance="Transparent"
+                           Padding="8,6"
+                           Margin="0,0,6,0"
+                           ToolTip="Watch the symbols named in a json file"
+                           Content="Load set"
+                           Icon="{ui:SymbolIcon FolderOpen24}" />
+                <ui:Button Command="{Binding CmdSaveWatchSet}"
+                           Appearance="Transparent"
+                           Padding="8,6"
+                           ToolTip="Write the watched symbols to a json file"
+                           Content="Save set"
+                           Icon="{ui:SymbolIcon Save24}" />
+            </StackPanel>
+
+            <ui:DataGrid Grid.Row="1"
+                         DataContext="{Binding ObserverViewModel}"
                          ItemsSource="{Binding ViewModels}"
                          AutoGenerateColumns="False"
                          CanUserAddRows="False"
@@ -211,10 +239,38 @@
                             <Style TargetType="TextBlock">
                                 <Setter Property="VerticalAlignment" Value="Center" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
-                                <Setter Property="ToolTip" Value="{Binding FullName}" />
+                                <!--  The path, plus whatever the declaration says about it.  -->
+                                <Setter Property="ToolTip" Value="{Binding Description}" />
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
+
+                    <!--
+                        Read from the symbol itself and never shown until now: the declared type, and
+                        whether the plc keeps the value across a power cycle - which is exactly what
+                        the backup and restore tabs act on.
+                    -->
+                    <DataGridTextColumn Header="Type" Width="Auto" Binding="{Binding TypeName}">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="VerticalAlignment" Value="Center" />
+                                <Setter Property="Opacity" Value="0.7" />
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTemplateColumn Header="" Width="Auto">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate DataType="{x:Type viewModels:SymbolObservationViewModel}">
+                                <TextBlock Text="P"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           Margin="4,0"
+                                           ToolTip="Persistent: kept across a power cycle, and included in a backup"
+                                           Visibility="{Binding IsPersistent, Converter={StaticResource VisibleIfTrue}}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
 
                     <DataGridTextColumn Header="{x:Static properties:Resources.Value}" Width="Auto" Binding="{Binding Value}">
                         <DataGridTextColumn.ElementStyle>
@@ -270,6 +326,7 @@
 
                 </ui:DataGrid.Columns>
             </ui:DataGrid>
+          </Grid>
         </Border>
 
         <GridSplitter Grid.Column="2" Grid.Row="2"

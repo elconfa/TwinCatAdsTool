@@ -4,8 +4,9 @@ A fork of [fbarresi/TwinCatAdsTool](https://github.com/fbarresi/TwinCatAdsTool) 
 you ever wanted and your lite alternative to Visual Studio.
 
 This fork fixes several defects in the persistent variable backup and restore engine, two of which
-could lose data without saying so, and modernises the application: .NET 8, ADS 7 (one binary for
-TwinCAT 4024 and 4026) and a Fluent interface.
+could lose data without saying so, turns the live value graph into a scope that can be stopped and
+scrolled through, and modernises the application: .NET 8, ADS 7 (one binary for TwinCAT 4024 and
+4026) and a Fluent interface.
 
 Everything below is either measured on a real plant or stated as unverified. Where a claim rests on
 a measurement, the numbers are given.
@@ -13,7 +14,9 @@ a measurement, the numbers are given.
 <img src="docs/images/screenshot-dark.png" width="720"/>
 
 Dark by default, with a light theme a click away — the *Theme* button at the foot of the navigation
-panel switches between the two without a restart, and the choice is remembered.
+panel switches between the two without a restart, and the choice is remembered. The shot is of the
+backup tab and carries the version badge of 1.3; the scope described below is on the explore tab and
+is not in it.
 
 ---
 
@@ -225,6 +228,133 @@ Full procedure and results: [docs/RESTORE-VERIFICATION.md](docs/RESTORE-VERIFICA
 
 ---
 
+## The explore tab is now a scope
+
+The explore tab watches live values and plots them. It had one weakness that made it hard to use for
+the thing it exists for, and it was structural rather than cosmetic: **one duration decided both what
+was kept and what was shown**. Samples were discarded at the moment they left the screen, so going
+back to look at what had just happened was impossible by construction — there was no missing button,
+there were no data.
+
+Recording and viewing are now two separate spans:
+
+| | |
+|---|---|
+| **Memory** | how much of the past is kept |
+| **Window** | how much of it is on screen |
+
+Scrolling and zooming move the window inside the recording. Everything on the plot is derived from
+the recording on every redraw — the series hold no state of their own — so freezing, scrolling and
+zooming are the same operation on two numbers, and the cost of a redraw is set by what is visible
+rather than by how long the tool has been running.
+
+### Stop, scroll, zoom
+
+**Stop** freezes the view as well as the recording. A scope that carries on scrolling into empty time
+after stop has thrown away the very thing that was being looked at. **Start** returns to the live edge.
+
+Arrows move by a quarter of a window at a time — a fraction of the width rather than a fixed time, so
+the gesture means the same thing at every zoom level. The wheel zooms; shift and the wheel scrolls.
+When the view has left the live edge it says **Frozen** and offers **Live** to return.
+
+OxyPlot's own zoom is deliberately off: the visible slice is state the view model owns, and two
+things moving the same axis would fight over it on every redraw.
+
+### Digital signals are drawn as digital signals
+
+A `BOOL` used to share a linear axis with the analogue signals — a flat line at the bottom of the
+plot — and its transitions were drawn by interpolating between two readings, so a change appeared as
+a diagonal ramp as long as the sampling interval. A bit does not travel through the values in
+between.
+
+Bits now get **a stair-step trace in a lane of their own**, stacked along the bottom, with the
+analogue signals sharing the band above. On a machine the interlocks and the step bits are most of
+what is worth watching, and they were the least readable thing on the plot.
+
+### Trigger
+
+The question a scope is really asked on a machine is not what the last ten minutes looked like but
+what happened around the moment something changed.
+
+Pick a plotted signal and a condition — *goes TRUE*, *goes FALSE*, *rises above*, *falls below* — and
+arm it. When it fires the recording **carries on for half a window**, so what followed the event is
+captured too, and only then does everything hold still with the event in the middle of the plot,
+marked by a line.
+
+Every condition is a crossing, never a state. A signal that is already TRUE when the trigger is armed
+has not just gone TRUE; firing on it would make arming useless for the one case it exists for. For
+the same reason the first reading of a signal never fires: with nothing before it there is no
+crossing, only a value.
+
+### Resolution, and what it honestly means
+
+Symbols were watched with the ADS default notification settings — `OnChange` with a cycle time of
+**200 ms** — which was never stated anywhere. The graph could not show anything shorter than that,
+and there was no way to find out, let alone change it.
+
+The cycle is now a field in the scope toolbar. Two things are worth knowing, and they are why the
+number is shown rather than hidden:
+
+- it is **how often the server looks**, not how often it transmits; the mode is still `OnChange`. It
+  is the shortest event that can be seen at all;
+- timestamps are taken **when the notification arrives at the pc**. Going down to 10 ms makes the
+  *order* of edges visible, not their *duration* to the millisecond. Faithful timing needs code
+  inside the PLC, which is the territory of TwinCAT Scope.
+
+Changing it registers the notification again: ADS reads those settings when a notification is created
+and does not revisit them.
+
+### Taking a capture away with you
+
+**CSV** exports the window being shown, not the whole recording: the slice on screen was framed
+deliberately, and exporting more would silently throw that away. The layout is one column per signal
+and one row per instant at which any of them was read. Signals do not change together, so a naive
+table would be mostly blank; every cell instead carries the value its signal *was holding* at that
+instant, which is what the signal actually was, and is what makes the file plottable in a spreadsheet
+without further work. The field separator follows the culture — where the decimal mark is a comma, a
+comma cannot also separate the fields.
+
+**PNG** saves the plot on white with dark text: the plot on screen is transparent and coloured for
+the current theme, and neither survives being put in a file.
+
+### A window of its own
+
+The scope shares the page with the symbol tree and the watch list, so it is never more than a band
+across the bottom. One button moves it into a window that can be made as large as the screen, or put
+on a second one beside the machine; closing that window brings it back. The control itself is moved
+rather than a second one built beside it — a plot model belongs to one plot view at a time — so the
+recording, the window being looked at and the trigger carry on undisturbed.
+
+### Watch sets
+
+The symbols being watched can be written to a file and read back, so a set survives the session and
+can be handed to whoever is at the machine next. The format is deliberately flat and meant to be
+edited by hand:
+
+```json
+{
+  "variables": [
+    { "path": "MAIN.bEnable", "graph": true },
+    { "path": "GVL.rSpeed",   "graph": true },
+    { "path": "MAIN.sState",  "graph": false }
+  ]
+}
+```
+
+Values are not saved. A watch set says what to look at; carrying stale readings in the same file
+would invite reading them as measurements. Paths the PLC does not have are collected and reported
+together with what ADS answered — a set written against another version of the program is exactly
+when knowing which symbols have gone matters.
+
+### Three columns that were already there
+
+`Type` and the persistence marker `P` are read straight off the symbol and had never been shown, and
+the tooltip on the name now carries the path together with the comment from the declaration. Knowing
+while watching a value that it is one of the variables the backup and restore tabs act on saves a
+trip back to the project.
+
+---
+
 ## Modernisation
 
 ### .NET 8
@@ -290,9 +420,13 @@ Details, and the parts that are deliberately unchanged, in [docs/UI-FLUENT.md](d
 restore of 10,978 leaves in 2.5 s with every leaf correct; nested branches, arrays of structures,
 arrays inside structures inside arrays, strings, REALs, BOOLs, TIME, LTIME and DT.
 
-**Verified by test**: 78 unit tests, run on every build.
+**Verified by test**: 113 unit tests, run on every build. Thirty-five of them cover the scope: the
+recording buffer and the sample that has to be carried in from before the window, the table a capture
+is exported as, and the trigger conditions.
 
-**Not verified**: multidimensional arrays (`ARRAY[0..n,0..m]`), which the plant used for the
+**Not verified**: the accuracy of scope timings below roughly ten milliseconds — the samples are
+stamped when they reach the pc, not when the PLC changed them, so short events are ordered correctly
+but not measured. And multidimensional arrays (`ARRAY[0..n,0..m]`), which the plant used for the
 verification does not contain. The write path addresses elements by position and can no longer
 raise `Dimensions mismatch!`, but whether the backup's flattened form lines up with the order of
 the child symbols has not been measured. Test 2 in

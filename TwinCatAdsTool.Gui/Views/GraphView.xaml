@@ -5,28 +5,192 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:oxy="http://oxyplot.org/wpf"
              xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
-             xmlns:properties="clr-namespace:TwinCatAdsTool.Gui.Properties"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              mc:Ignorable="d"
              d:DesignHeight="300" d:DesignWidth="800">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <oxy:PlotView Grid.Row="0"
-                      Margin="12,12,12,0"
-                      Background="Transparent"
-                      Model="{Binding PlotModel}" />
+        <!--
+            One flow rather than a row pinned left and a row pinned right. The scope shares the page
+            with the symbol tree and the watch list, so its width is whatever is left over: laid out
+            in fixed columns the controls at the far end were simply cut off, which is how the button
+            that opens the scope in its own window managed not to exist. Wrapped, they fall onto a
+            second line when the pane is narrow and back onto one when it is not.
+        -->
+        <WrapPanel Grid.Row="0" Margin="12,12,12,0">
+            <ui:Button Command="{Binding CmdToggleRecording}"
+                       Appearance="Primary"
+                       Padding="10,6"
+                       Margin="0,0,12,4"
+                       ToolTip="Stop recording; what has been captured stays"
+                       Content="Stop"
+                       Icon="{ui:SymbolIcon Stop24}"
+                       Visibility="{Binding IsRecording, Converter={StaticResource VisibleIfTrue}}" />
 
-        <StackPanel Grid.Row="1"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    Margin="12,8,12,12">
-            <TextBlock Text="{x:Static properties:Resources.DisplayedTimespan}"
+            <ui:Button Command="{Binding CmdToggleRecording}"
+                       Appearance="Primary"
+                       Padding="10,6"
+                       Margin="0,0,12,4"
+                       ToolTip="Record again, from the live edge"
+                       Content="Start"
+                       Icon="{ui:SymbolIcon Play24}"
+                       Visibility="{Binding IsRecording, Converter={StaticResource VisibleIfFalse}}" />
+
+            <ui:Button Command="{Binding CmdPanBack}"
+                       Appearance="Transparent" Padding="8" Margin="0,0,2,4"
+                       ToolTip="Back a quarter of the window"
+                       Icon="{ui:SymbolIcon ChevronLeft24}" />
+            <ui:Button Command="{Binding CmdPanForward}"
+                       Appearance="Transparent" Padding="8" Margin="0,0,10,4"
+                       ToolTip="Forward a quarter of the window"
+                       Icon="{ui:SymbolIcon ChevronRight24}" />
+
+            <ui:Button Command="{Binding CmdZoomIn}"
+                       Appearance="Transparent" Padding="8" Margin="0,0,2,4"
+                       ToolTip="Halve the window. Wheel does the same; shift and wheel scrolls"
+                       Icon="{ui:SymbolIcon ZoomIn24}" />
+            <ui:Button Command="{Binding CmdZoomOut}"
+                       Appearance="Transparent" Padding="8" Margin="0,0,10,4"
+                       ToolTip="Double the window"
+                       Icon="{ui:SymbolIcon ZoomOut24}" />
+
+            <!--  Only worth offering while the view has actually left the live edge.  -->
+            <ui:Button Command="{Binding CmdGoLive}"
+                       Appearance="Transparent" Padding="8,6" Margin="0,0,4,4"
+                       ToolTip="Back to now"
+                       Content="Live"
+                       Icon="{ui:SymbolIcon FastForward24}"
+                       Visibility="{Binding IsFollowing, Converter={StaticResource VisibleIfFalse}}" />
+
+            <TextBlock Text="Frozen"
                        Style="{StaticResource SecondaryText}"
-                       Margin="0,0,8,0" />
-            <xctk:TimeSpanUpDown Value="{Binding ExpiresAfter}" MinWidth="110" />
-        </StackPanel>
+                       VerticalAlignment="Center"
+                       Margin="0,0,10,4"
+                       Visibility="{Binding IsFollowing, Converter={StaticResource VisibleIfFalse}}" />
+
+            <ui:Button Command="{Binding CmdClear}"
+                       Appearance="Transparent" Padding="8" Margin="0,0,10,4"
+                       ToolTip="Discard everything recorded"
+                       Icon="{ui:SymbolIcon Eraser24}" />
+
+            <ui:Button Command="{Binding CmdExportCsv}"
+                       Appearance="Transparent" Padding="8" Margin="0,0,2,4"
+                       ToolTip="Export the window being shown as csv"
+                       Icon="{ui:SymbolIcon Table24}" />
+            <ui:Button Command="{Binding CmdExportImage}"
+                       Appearance="Transparent" Padding="8" Margin="0,0,10,4"
+                       ToolTip="Save the plot as a picture"
+                       Icon="{ui:SymbolIcon Image24}" />
+
+            <!--
+                The scope shares the page with the symbol tree and the watch list, so it is never
+                more than a band across the bottom. A window of its own can be made as large as the
+                screen, or moved onto a second one beside the machine.
+            -->
+            <ui:Button x:Name="PopOutButton"
+                       Click="TogglePopOut"
+                       Appearance="Transparent" Padding="8" Margin="0,0,16,4"
+                       ToolTip="Show the scope in a window of its own"
+                       Icon="{ui:SymbolIcon WindowNew24}" />
+
+            <TextBlock Text="Window"
+                       Style="{StaticResource SecondaryText}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,6,4" />
+            <xctk:TimeSpanUpDown Value="{Binding Span}" MinWidth="96" Margin="0,0,14,4"
+                                 VerticalAlignment="Center"
+                                 ToolTip="How much of the recording is on screen" />
+
+            <TextBlock Text="Memory"
+                       Style="{StaticResource SecondaryText}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,6,4" />
+            <xctk:TimeSpanUpDown Value="{Binding History}" MinWidth="96" Margin="0,0,14,4"
+                                 VerticalAlignment="Center"
+                                 ToolTip="How far back the recording is kept" />
+
+            <!--
+                The ads notification cycle. It is the shortest event that can reach the plot at all,
+                and it used to be fixed at the ads default of 200 ms without saying so.
+            -->
+            <TextBlock Text="Sample ms"
+                       Style="{StaticResource SecondaryText}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,6,4" />
+            <xctk:DoubleUpDown Value="{Binding SampleMilliseconds}"
+                               Minimum="1" Maximum="60000" Increment="10"
+                               FormatString="F0"
+                               MinWidth="72"
+                               Margin="0,0,0,4"
+                               VerticalAlignment="Center"
+                               ToolTip="How often the plc is asked to look at these symbols" />
+        </WrapPanel>
+
+        <!--
+            The question a scope is really asked on a machine is not what the last ten minutes looked
+            like but what happened around the moment something changed. Arming waits for that moment,
+            keeps recording for half a window past it so the aftermath is captured too, and then holds
+            everything still with the event in the middle.
+        -->
+        <WrapPanel Grid.Row="1" Margin="12,8,12,0">
+            <TextBlock Text="Trigger when"
+                       Style="{StaticResource SecondaryText}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,8,4" />
+
+            <ComboBox ItemsSource="{Binding Symbols}"
+                      DisplayMemberPath="Name"
+                      SelectedItem="{Binding TriggerSymbol}"
+                      MinWidth="150"
+                      VerticalAlignment="Center"
+                      Margin="0,0,6,4"
+                      ToolTip="Which of the plotted signals to wait on" />
+
+            <ComboBox ItemsSource="{Binding TriggerEdges}"
+                      DisplayMemberPath="Label"
+                      SelectedValuePath="Edge"
+                      SelectedValue="{Binding TriggerEdge}"
+                      MinWidth="130"
+                      VerticalAlignment="Center"
+                      Margin="0,0,6,4" />
+
+            <xctk:DoubleUpDown Value="{Binding TriggerLevel}"
+                               MinWidth="90"
+                               Margin="0,0,12,4"
+                               ToolTip="The level the two crossing conditions are measured against" />
+
+            <ui:Button Command="{Binding CmdToggleArmed}"
+                       Appearance="Secondary"
+                       Padding="10,6"
+                       Margin="0,0,12,4"
+                       Content="Arm"
+                       Icon="{ui:SymbolIcon Timer24}"
+                       Visibility="{Binding IsArmed, Converter={StaticResource VisibleIfFalse}}" />
+
+            <ui:Button Command="{Binding CmdToggleArmed}"
+                       Appearance="Primary"
+                       Padding="10,6"
+                       Margin="0,0,12,4"
+                       Content="Disarm"
+                       Icon="{ui:SymbolIcon Timer24}"
+                       Visibility="{Binding IsArmed, Converter={StaticResource VisibleIfTrue}}" />
+
+            <TextBlock Text="{Binding TriggerState}"
+                       Style="{StaticResource SecondaryText}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,0,4" />
+        </WrapPanel>
+
+        <oxy:PlotView x:Name="Plot"
+                      Grid.Row="2"
+                      Margin="12,8,12,12"
+                      Background="Transparent"
+                      PreviewMouseWheel="PlotWheel"
+                      Model="{Binding PlotModel}" />
     </Grid>
 </UserControl>

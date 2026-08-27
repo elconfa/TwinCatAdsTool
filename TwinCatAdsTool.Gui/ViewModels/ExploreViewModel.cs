@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.Reactive.Disposables;
 using System.ComponentModel;
 using System.Reactive.Linq;
 using DynamicData.Binding;
@@ -8,13 +10,18 @@ using System.Linq;
 using System.Reactive;
 using System.Reactive.Subjects;
 using System.Threading.Tasks;
+using System.IO;
 using System.Windows;
+using Newtonsoft.Json;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
 using ReactiveUI;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using TwinCAT;
 using TwinCAT.Ads.TypeSystem;
 using TwinCAT.TypeSystem;
 using TwinCatAdsTool.Gui.Commands;
+using TwinCatAdsTool.Gui.Models;
 using TwinCatAdsTool.Gui.Properties;
 using TwinCatAdsTool.Interfaces.Commons;
 using TwinCatAdsTool.Interfaces.Extensions;
@@ -38,6 +45,13 @@ namespace TwinCatAdsTool.Gui.ViewModels
         private string searchText;
 
         private ObservableCollection<ISymbol> treeNodes;
+
+        /// <summary>
+        /// The symbols a loaded watch set wants on the scope, until they turn up. A symbol reaches
+        /// the list through a selection that is delivered on the dispatcher, so it does not exist
+        /// yet when the file that asked for it has just been read.
+        /// </summary>
+        private readonly HashSet<string> awaitingGraph = new HashSet<string>();
 
 
         public ExploreViewModel(IClientService clientService,
@@ -86,6 +100,10 @@ namespace TwinCatAdsTool.Gui.ViewModels
         public ObserverViewModel ObserverViewModel { get; set; }
 
         public ReactiveCommand<RxVoid, RxVoid> Read { get; set; }
+
+        public ReactiveCommand<RxVoid, RxVoid> CmdSaveWatchSet { get; set; }
+
+        public ReactiveCommand<RxVoid, RxVoid> CmdLoadWatchSet { get; set; }
 
         public ObservableCollection<ISymbol> SearchResults { get; } = new ObservableCollection<ISymbol>();
 
@@ -159,6 +177,10 @@ namespace TwinCatAdsTool.Gui.ViewModels
             GraphViewModel = viewModelFactory.CreateViewModel<GraphViewModel>();
             GraphViewModel.AddDisposableTo(Disposables);
 
+            ObserverViewModel.ViewModels.CollectionChanged += OnObservedSymbolsChanged;
+            Disposable.Create(() => ObserverViewModel.ViewModels.CollectionChanged -= OnObservedSymbolsChanged)
+                .AddDisposableTo(Disposables);
+
             this.WhenAnyValue(x => x.ObservedSymbols).Subscribe().AddDisposableTo(Disposables);
 
             // Listen to all property change events on SearchText
@@ -221,6 +243,12 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
             Read = ReactiveCommand.CreateFromTask(ReadVariables, canExecute: connected)
                 .AddDisposableTo(Disposables);
+
+            CmdSaveWatchSet = ReactiveCommand.CreateFromTask(SaveWatchSet)
+                .AddDisposableTo(Disposables);
+
+            CmdLoadWatchSet = ReactiveCommand.CreateFromTask(LoadWatchSet, canExecute: connected)
+                .AddDisposableTo(Disposables);
         }
 
         private Task<RxVoid> AddGraph(SymbolObservationViewModel symbolObservationViewModel)
@@ -277,6 +305,200 @@ namespace TwinCatAdsTool.Gui.ViewModels
             return RxVoid.Default;
         }
 
+
+        private void OnObservedSymbolsChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems == null)
+            {
+                return;
+            }
+
+            foreach (var added in e.NewItems.OfType<SymbolObservationViewModel>())
+            {
+                if (awaitingGraph.Remove(added.FullName))
+                {
+                    GraphViewModel.AddSymbol(added);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Writes the watched symbols to a file: which ones, and which of them are on the scope.
+        /// Values are deliberately not saved - a watch set says what to look at, and carrying stale
+        /// readings around in the same file would invite reading them as measurements.
+        /// </summary>
+        private Task<RxVoid> SaveWatchSet()
+        {
+            try
+            {
+                var graphed = new HashSet<string>(GraphViewModel.Symbols.Select(symbol => symbol.FullName));
+
+                var set = new WatchSet
+                {
+                    Variables = ObserverViewModel.ViewModels
+                        .Select(symbol => new WatchSetEntry
+                        {
+                            Path = symbol.FullName,
+                            Graph = graphed.Contains(symbol.FullName)
+                        })
+                        .ToList()
+                };
+
+                if (set.Variables.Count == 0)
+                {
+                    MessageBox.Show("There is nothing being watched to save.", "Watch set", MessageBoxButton.OK);
+                    return Task.FromResult(RxVoid.Default);
+                }
+
+                var dialog = new SaveFileDialog
+                {
+                    Filter = "Json|*.json",
+                    Title = "Save the watched symbols",
+                    FileName = $"WatchSet_{DateTime.Now:yyyy-MM-dd-HHmmss}.json",
+                    RestoreDirectory = true
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    File.WriteAllText(dialog.FileName, JsonConvert.SerializeObject(set, Formatting.Indented));
+                    Logger.Debug($"Saved {set.Variables.Count} watched symbols to {dialog.FileName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Could not save the watch set", ex);
+                MessageBox.Show(ex.Message, ex.GetType().ToString(), MessageBoxButton.OK);
+            }
+
+            return Task.FromResult(RxVoid.Default);
+        }
+
+        /// <summary>
+        /// Reads a watch set and adds what it names. Paths the plc does not have are collected and
+        /// reported together rather than passed over: a set written against another version of the
+        /// program is exactly when knowing which symbols have gone matters.
+        /// </summary>
+        private Task<RxVoid> LoadWatchSet()
+        {
+            try
+            {
+                var dialog = new OpenFileDialog
+                {
+                    Filter = "Json|*.json",
+                    Title = "Load a set of symbols to watch",
+                    RestoreDirectory = true
+                };
+
+                if (dialog.ShowDialog() != true)
+                {
+                    return Task.FromResult(RxVoid.Default);
+                }
+
+                var set = JsonConvert.DeserializeObject<WatchSet>(File.ReadAllText(dialog.FileName));
+
+                if (set?.Variables == null || set.Variables.Count == 0)
+                {
+                    MessageBox.Show("The file names no variables.", "Watch set", MessageBoxButton.OK);
+                    return Task.FromResult(RxVoid.Default);
+                }
+
+                var missing = new List<string>();
+
+                foreach (var entry in set.Variables)
+                {
+                    if (string.IsNullOrWhiteSpace(entry?.Path))
+                    {
+                        continue;
+                    }
+
+                    // Already watched: the observer answers a second request with a message box of its
+                    // own, and a file naming twenty symbols would produce twenty of them.
+                    var watched = ObserverViewModel.ViewModels
+                        .FirstOrDefault(candidate => candidate.FullName == entry.Path);
+
+                    if (watched != null)
+                    {
+                        if (entry.Graph)
+                        {
+                            GraphViewModel.AddSymbol(watched);
+                        }
+
+                        continue;
+                    }
+
+                    if (!TryResolveSymbol(entry.Path, out var symbol, out var reason))
+                    {
+                        missing.Add($"{entry.Path}  -  {reason}");
+                        continue;
+                    }
+
+                    // A structure or an array has no single value to watch. Saying so beats dropping
+                    // the line without a word, which is what registering it would have done.
+                    if (symbol.IsContainerType)
+                    {
+                        missing.Add($"{entry.Path}  -  not a single value");
+                        continue;
+                    }
+
+                    if (entry.Graph)
+                    {
+                        awaitingGraph.Add(entry.Path);
+                    }
+
+                    RegisterSymbolObserver(symbol);
+                }
+
+                if (missing.Count > 0)
+                {
+                    Logger.Warn($"{missing.Count} symbols from {dialog.FileName} could not be resolved");
+                    MessageBox.Show(
+                        "These could not be watched:" + Environment.NewLine + string.Join(Environment.NewLine, missing),
+                        "Watch set",
+                        MessageBoxButton.OK);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Could not load the watch set", ex);
+                MessageBox.Show(ex.Message, ex.GetType().ToString(), MessageBoxButton.OK);
+            }
+
+            return Task.FromResult(RxVoid.Default);
+        }
+
+        /// <summary>
+        /// Finds the symbol a path names.
+        ///
+        /// The flat collection is only the symbol table the plc publishes, which is not everything
+        /// that has a path: an element of an array, and anything below it, exists as a symbol only
+        /// once the tree has been walked down to it. Those are exactly the symbols worth putting in
+        /// a watch set on a machine built out of arrays of structures, and asking the flat table for
+        /// them answers that the plc does not have them - which is not true.
+        ///
+        /// So the flat table is tried first, because it hands back the same instance the tree and the
+        /// search use, and the server is asked directly when that fails.
+        /// </summary>
+        private bool TryResolveSymbol(string path, out ISymbol symbol, out string reason)
+        {
+            if (clientService.FlatViewSymbols.TryGetInstance(path, out symbol) && symbol != null)
+            {
+                reason = null;
+                return true;
+            }
+
+            try
+            {
+                symbol = clientService.Client.ReadSymbol(path);
+                reason = symbol == null ? "not on this plc" : null;
+                return symbol != null;
+            }
+            catch (Exception ex)
+            {
+                symbol = null;
+                reason = ex.Message;
+                return false;
+            }
+        }
 
         private Task<RxVoid> RegisterSymbolObserver(ISymbol symbol)
         {
