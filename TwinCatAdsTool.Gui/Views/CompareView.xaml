@@ -1,4 +1,4 @@
-<UserControl x:Class="TwinCatAdsTool.Gui.Views.CompareView"
+﻿<UserControl x:Class="TwinCatAdsTool.Gui.Views.CompareView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -67,6 +67,11 @@
             Scrollbars of their own rather than the ones wpf ui draws, which are a few pixels wide
             and only widen once the pointer is already on them - too fine a target for a pane that
             is scrolled constantly. Colours stay theme aware through DynamicResource.
+
+            Every piece below is handed to its user by key. An implicit style cannot do this job:
+            the scroll viewer template that wpf ui applies names its scrollbars PART_VerticalScrollBar
+            and gives each one a style of its own, and an explicit style always wins over an implicit
+            one - so a Width declared implicitly never took part in the decision at all.
         -->
         <Style x:Key="DiffScrollBarThumb" TargetType="Thumb">
             <Setter Property="OverridesDefaultStyle" Value="True" />
@@ -128,6 +133,83 @@
             </Border>
         </ControlTemplate>
 
+        <!--  Named, so that the scroll viewer template below can hand it over explicitly.  -->
+        <Style x:Key="DiffScrollBar" TargetType="ScrollBar">
+            <Setter Property="OverridesDefaultStyle" Value="True" />
+            <Setter Property="Width" Value="16" />
+            <Setter Property="MinWidth" Value="16" />
+            <Setter Property="Template" Value="{StaticResource DiffScrollBarVertical}" />
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto" />
+                    <Setter Property="MinWidth" Value="0" />
+                    <Setter Property="Height" Value="16" />
+                    <Setter Property="MinHeight" Value="16" />
+                    <Setter Property="Template" Value="{StaticResource DiffScrollBarHorizontal}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!--
+            The pane owns its scroll viewer outright. Leaving a bare ScrollViewer to be styled by
+            whatever the theme provides is what put wpf ui's own template back in place, scrollbars
+            included; an explicit style is the only way to keep it out.
+
+            PART_ScrollContentPresenter, PART_VerticalScrollBar and PART_HorizontalScrollBar are the
+            names ScrollViewer looks for when it wires itself up, so they are not free to change.
+        -->
+        <Style x:Key="DiffScroller" TargetType="ScrollViewer">
+            <Setter Property="OverridesDefaultStyle" Value="True" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollViewer">
+                        <Grid Background="{TemplateBinding Background}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                                    Grid.Row="0" Grid.Column="0"
+                                                    CanContentScroll="{TemplateBinding CanContentScroll}"
+                                                    CanHorizontallyScroll="False"
+                                                    CanVerticallyScroll="False"
+                                                    Content="{TemplateBinding Content}"
+                                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                    Margin="{TemplateBinding Padding}" />
+
+                            <ScrollBar x:Name="PART_VerticalScrollBar"
+                                       Grid.Row="0" Grid.Column="1"
+                                       Orientation="Vertical"
+                                       Cursor="Arrow"
+                                       Style="{StaticResource DiffScrollBar}"
+                                       Minimum="0"
+                                       Maximum="{TemplateBinding ScrollableHeight}"
+                                       ViewportSize="{TemplateBinding ViewportHeight}"
+                                       Value="{Binding VerticalOffset, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
+                                       Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}" />
+
+                            <ScrollBar x:Name="PART_HorizontalScrollBar"
+                                       Grid.Row="1" Grid.Column="0"
+                                       Orientation="Horizontal"
+                                       Cursor="Arrow"
+                                       Style="{StaticResource DiffScrollBar}"
+                                       Minimum="0"
+                                       Maximum="{TemplateBinding ScrollableWidth}"
+                                       ViewportSize="{TemplateBinding ViewportWidth}"
+                                       Value="{Binding HorizontalOffset, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
+                                       Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!--
             Virtualised and scrolling by line. A backup of a real plant is well over ten thousand
             lines: realising them all is what made the wheel feel dead. Scrolling by line rather
@@ -150,38 +232,10 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBox">
                         <!--
-                            A plain ScrollViewer. The one wpf ui puts in its own list template is a
-                            PassiveScrollViewer, which by design does not act on the mouse wheel and
-                            lets it bubble to whatever is above - which is why the wheel worked only
-                            while the pointer was over the scrollbar and did nothing over the rows.
-
                             The scrollbar settings above are attached properties that inherit down
                             the tree, so they reach this ScrollViewer without being restated.
                         -->
-                        <ScrollViewer Focusable="False">
-                            <ScrollViewer.Resources>
-                                <!--
-                                    Declared here, on the scroll viewer itself, so that the
-                                    scrollbars built inside its own template are certain to find
-                                    it: an implicit style further out is not guaranteed to reach
-                                    across a template boundary.
-                                -->
-                                <Style TargetType="ScrollBar">
-                                    <Setter Property="OverridesDefaultStyle" Value="True" />
-                                    <Setter Property="Width" Value="16" />
-                                    <Setter Property="MinWidth" Value="16" />
-                                    <Setter Property="Template" Value="{StaticResource DiffScrollBarVertical}" />
-                                    <Style.Triggers>
-                                        <Trigger Property="Orientation" Value="Horizontal">
-                                            <Setter Property="Width" Value="Auto" />
-                                            <Setter Property="MinWidth" Value="0" />
-                                            <Setter Property="Height" Value="16" />
-                                            <Setter Property="MinHeight" Value="16" />
-                                            <Setter Property="Template" Value="{StaticResource DiffScrollBarHorizontal}" />
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ScrollViewer.Resources>
+                        <ScrollViewer Style="{StaticResource DiffScroller}">
                             <ItemsPresenter />
                         </ScrollViewer>
                     </ControlTemplate>
@@ -263,6 +317,7 @@
             <ListBox x:Name="LeftPane"
                      ItemsSource="{Binding LeftLines}"
                      Style="{StaticResource DiffPane}"
+                     PreviewMouseWheel="PaneWheel"
                      ScrollViewer.ScrollChanged="PaneScrolled" />
         </Border>
 
@@ -270,6 +325,7 @@
             <ListBox x:Name="RightPane"
                      ItemsSource="{Binding RightLines}"
                      Style="{StaticResource DiffPane}"
+                     PreviewMouseWheel="PaneWheel"
                      ScrollViewer.ScrollChanged="PaneScrolled" />
         </Border>
     </Grid>

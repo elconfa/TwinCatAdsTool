@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace TwinCatAdsTool.Gui.Views
@@ -23,6 +24,35 @@ namespace TwinCatAdsTool.Gui.Views
         public CompareView()
         {
             InitializeComponent();
+        }
+
+        /// <summary>
+        /// Scrolls the pane the pointer is over. The wheel is taken here, on the tunnelling event
+        /// of the list itself, rather than left to the scroll viewer inside the template: the
+        /// pointer sits over a row, and whether the event ever reaches the scroll viewer depends
+        /// on which scroll viewer the theme decided to build. Some of the ones wpf ui provides
+        /// decline the wheel on purpose so that the page behind them scrolls instead, which is
+        /// exactly the behaviour the panes must not have. Handling it here settles the question:
+        /// the list sees the event before anything inside it can, so nothing downstream matters.
+        /// </summary>
+        private void PaneWheel(object sender, MouseWheelEventArgs e)
+        {
+            var scroller = ReferenceEquals(sender, LeftPane)
+                ? ScrollerOf(LeftPane, ref leftScroller)
+                : ScrollerOf(RightPane, ref rightScroller);
+
+            if (scroller == null || e.Delta == 0)
+            {
+                return;
+            }
+
+            // A notch is 120, and windows says how many lines one notch is worth. Set to page
+            // scrolling it reports -1, in which case a screenful is the honest reading of it.
+            var linesPerNotch = SystemParameters.WheelScrollLines;
+            var step = linesPerNotch < 0 ? scroller.ViewportHeight : linesPerNotch;
+
+            scroller.ScrollToVerticalOffset(scroller.VerticalOffset - (e.Delta / 120.0 * step));
+            e.Handled = true;
         }
 
         private void PaneScrolled(object sender, ScrollChangedEventArgs e)
