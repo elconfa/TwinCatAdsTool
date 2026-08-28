@@ -450,11 +450,39 @@ restore, then compare, and let the exit code decide.
 An AMS net id is checked before anything connects. A mistyped one would otherwise come back much
 later as a timeout, which reads like a network problem rather than a typing one.
 
-### Two things worth knowing
+### In practice
 
-The application is a Windows program rather than a console one, so `cmd` returns to the prompt while
-it is still running. Use `start /wait`, or PowerShell's `Start-Process -Wait`, when the exit code is
-wanted. Neither matters for a scheduled task or for `NT_StartProcess` called from the PLC.
+`start /wait /b` is what makes `errorlevel` meaningful: the application is a Windows program rather
+than a console one, so `cmd` would otherwise carry on to the next line while it is still running.
+
+A nightly backup, keeping the date in the name, as a scheduled task:
+
+```bat
+for /f "tokens=2 delims==" %%d in ('wmic os get localdatetime /value') do set t=%%d
+start /wait /b TwinCatAdsTool.exe backup 5.24.108.31.1.1 851 D:\backups\plant_%t:~0,8%.json
+if errorlevel 3 echo INCOMPLETE BACKUP >> D:\backups\alarm.txt
+```
+
+`if errorlevel 3` is true for 3 and anything above it, which is what you want: the backup file was
+written but it does not hold everything.
+
+Verifying a restore, which until now had to be done by hand:
+
+```bat
+start /wait /b TwinCatAdsTool.exe restore 5.24.108.31.1.1 851 D:\backups\plant.json
+start /wait /b TwinCatAdsTool.exe compare 5.24.108.31.1.1 851 D:\backups\plant.json
+if errorlevel 1 echo THE PLC DOES NOT MATCH THE FILE
+```
+
+The second line is the one worth having. A restore that reports success is not proof that the plant
+holds what the file says, which is the defect this fork was written to fix; reading the plant back
+and comparing it is.
+
+### One thing worth saying out loud
+
+In PowerShell the equivalent of `start /wait /b` is `Start-Process -Wait`. Neither is needed for a
+scheduled task or for `NT_StartProcess` called from the PLC, which do not read an exit code from a
+shell.
 
 **A restore writes to the PLC without asking.** That is what a command line is for, and it is worth
 saying out loud.
@@ -542,9 +570,11 @@ buffer and the sample that has to be carried in from before the window, the tabl
 exported as, the trigger conditions — and forty-one cover the command line: what it accepts and
 refuses, and the leaf by leaf comparison behind `compare`.
 
-**Not verified**: the command line against a real PLC. Its parsing and its comparison are covered by
-tests, and it drives the same engine the window drives, but nobody has yet run `backup` from a
-scheduled task on a live controller. And the accuracy of scope timings below roughly ten milliseconds — the samples are
+**Verified on a real PLC, by hand**: `backup` and `restore` from the command line against a running
+controller. Nobody has yet run either from a scheduled task, and `compare` has not been exercised on
+a plant.
+
+**Not verified**: the accuracy of scope timings below roughly ten milliseconds — the samples are
 stamped when they reach the pc, not when the PLC changed them, so short events are ordered correctly
 but not measured. And multidimensional arrays (`ARRAY[0..n,0..m]`), which the plant used for the
 verification does not contain. The write path addresses elements by position and can no longer

@@ -3,7 +3,7 @@
   <!-- One version for every assembly. The release workflow overrides it with the tag that is
        being built, so the tag, the binary and the version on screen cannot drift apart. -->
   <PropertyGroup>
-    <Version>1.4.0</Version>
+    <Version>1.5.0</Version>
   </PropertyGroup>
 
   <!-- Lets the wpf projects be compile checked on macos and linux. Building for windows from a
