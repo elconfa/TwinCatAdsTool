@@ -64,8 +64,9 @@ Three consequences:
   variable.
 - **Array elements are addressed by position** among the child symbols, not by a computed index.
   This is what removes `ArrayIndexConverter`'s `Dimensions mismatch!` from the write path for
-  multidimensional arrays. Whether that is enough to make them work end to end is not yet measured:
-  the backup still flattens them.
+  multidimensional arrays. The backup still flattens them, and it was not obvious that the two
+  orders agree; measured on a plant, they do — 92,256 leaves of an `ARRAY[0..30, 0..30] OF DUT`
+  restored with none out of place. Test 2 in [RESTORE-VERIFICATION.md](RESTORE-VERIFICATION.md).
 - **The conversion is a pure function**, so it is testable without a PLC —
   `PlcLeafPlannerTests.cs`. This matters: the previous design could not be covered, because
   `FakeValueNode.TryGetMutableMember` returned the same object where the real library returns a

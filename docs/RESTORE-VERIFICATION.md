@@ -72,58 +72,91 @@ against 16 ok and 4 failed before — the four being `TIME` and `LTIME`, see `Va
 
 ---
 
-## Test 2 — Multidimensional arrays and arrays of DUT
+## Test 2 — Multidimensional arrays
 
-Still open. The plant used for Test 3 does not contain multidimensional arrays.
+### What was in doubt
 
-The test project has no such types either. Create a new GVL in XAE and paste:
+The backup **flattens** a rank 2 array: `ARRAY[0..30, 0..30]` comes out as a single list of 961
+elements, and nothing in the json records which order that flattening used. The write path
+addresses array elements **by position** among the child symbols rather than by a computed index,
+so `Dimensions mismatch!` can no longer occur there — but whether the two orders agree was a
+different question, and it was not answered by reading the code. If they disagreed, a restore would
+report success and put every element in the wrong place.
+
+Test 3 could not settle it: that plant contains no multidimensional array.
+
+### Why this variable
+
+A second plant declares
 
 ```iecst
-{attribute 'qualified_only'}
-VAR_GLOBAL PERSISTENT
-    // array of structures: the main use case of the tool
-    ArrOfDut    : ARRAY[0..2] OF UserInnerInnerDUT;
-
-    // jagged array: rank 1 whose element is itself an array
-    ArrJagged   : ARRAY[0..1] OF ARRAY[0..1] OF UserInnerInnerDUT;
-
-    // multidimensional array: rank 2, a different type from the previous one
-    ArrMulti    : ARRAY[0..1, 0..1] OF UserInnerInnerDUT;
-
-    // same rank 2, but of primitives: a different code path
-    ArrMultiInt : ARRAY[0..1, 0..1] OF INT;
-END_VAR
+AAArray : ARRAY[0..NumMaxCassetti, 0..NumMaxCassetti] OF DUT_Cass;
 ```
 
-Dimensions kept minimal on purpose, so the JSON stays readable by eye.
+with `NumMaxCassetti` = 30, so 961 elements of 96 leaves each: **92,256 leaves in a single
+variable**, against 10,978 for the whole of Test 3. `DUT_Cass` nests structures, an array of
+structures (`_GestMotore`), an array of integers, strings, REALs and BOOLs, so the element type is
+not a toy.
+
+It also happened to be **entirely zero** — all 961 elements identical — which is exactly why filling
+it was necessary: restored as it stood, it would have proved nothing, and there was nothing
+configured to lose.
+
+### Generating the file
+
+`Tests/ManualVerification/fill_multidim.py` fills that one variable and leaves the rest of the file
+untouched. It keeps the two guarantees of `fill_backup.py` — every leaf changes, no two sibling
+leaves get the same value — and adds what this test needs, a **marker of the position**, redundant
+across three members so that one of them failing does not blind the test. With `k` the flat index,
+`i = k // 31` and `j = k % 31`:
+
+| Member | Value | |
+|---|---|---|
+| `_Setting._NomeCassetto` | `"R05C00"` | readable by eye |
+| `_Setting._NumeroLogico` | `j + 1` | 1..31, fits any integer type |
+| `_Config._NumeroLogico` | `i + 1` | says where the element landed if the string is too long for its `STRING(n)` |
+
+A transposition then reads straight off `k=1` and `k=31`, which swap.
+
+```
+python3 Tests/ManualVerification/fill_multidim.py Backup_....json filled.json
+python3 Tests/ManualVerification/compare_multidim.py filled.json Backup_after.json
+```
+
+The comparison script does not stop at counting: on a divergence it prints where each element
+actually came back, and counts the transposed ones on its own.
 
 ### Procedure
 
-1. **Backup** and open the JSON. Compare the shape:
+1. **Backup**, and keep the file. It is both the reference and the way back.
+2. Generate the filled file, **stop the PLC**, restore it.
+3. **Backup** again and compare.
 
-   | Variable | Expected shape |
-   |---|---|
-   | `ArrJagged` | array of 2 arrays of 2 → `[[{...},{...}],[{...},{...}]]` |
-   | `ArrMulti` | **flat** array of 4 → `[{...},{...},{...},{...}]` |
-   | `ArrMultiInt` | **flat** array of 4 → `[0,0,0,0]` |
+### Result: the orders agree
 
-   If `ArrMulti` comes out nested like `ArrJagged`, the analysis of the shape is wrong; report it.
+Run of 2026-08-28, PLC stopped.
 
-2. Change one value inside `ArrOfDut[0]`, one inside `ArrJagged`, one in `ArrMulti` and one in
-   `ArrMultiInt`. **Restore** with the PLC stopped, then read back.
-
-### How to read the result
-
-| Observation | Conclusion |
+| | |
 |---|---|
-| All four change | Leaf-wise writing covers multidimensional arrays too. |
-| `ArrOfDut` and `ArrJagged` change, `ArrMulti` and `ArrMultiInt` do not | Only the shape of the **backup** is left to fix: it flattens rank 2, and the restore puts the values back in the wrong order or fails. |
-| Something reports success but does not change on the PLC | Report it immediately: it means a write is accepted and has no effect, a case Test 1 does not cover. |
+| Leaves of `AAArray` correct | **92,256 / 92,256** |
+| Divergent | **0** |
+| Leaves actually changed on the PLC | 92,256 |
+| Elements transposed | 0 |
+| Correct over the whole file, all variables | 103,234 / 103,234 |
 
-Note: the write path addresses array elements **by position** among the child symbols rather than by
-a computed index, so `Dimensions mismatch!` can no longer occur there. Whether that is enough is to
-be measured, not assumed — the backup still produces them flattened, and it has not been verified
-that the order of the child symbols matches that flattening.
+The last two rows are what make the first one mean something. Had nothing been written, the
+comparison would have come back perfect all the same; 92,256 leaves differ from the backup taken
+before, so the values really did make the round trip. And the markers came back in place — `k=1` is
+`R00C01` while `k=31` is `R01C00` — so the flattening is **row major**, the last index varying
+fastest, and the order of the child symbols in the write path matches it.
+
+Two unknowns the file could not resolve are resolved too: strings of six and of three characters
+went into members that were empty in the backup without an error, so neither is a short `STRING(n)`,
+and no integer in 1..127 was refused, so none of the members touched is a `strict` enum.
+
+**Multidimensional arrays are verified end to end.** The reservation that remains is narrow: one
+plant, one rank, square. Rank 3, or a non square rank 2, would exercise a flattening this test
+cannot distinguish from row major.
 
 ---
 
@@ -190,5 +223,6 @@ Restore of all 10,978 leaves took **2.5 seconds**.
 
 ## Restoring the plant afterwards
 
-Test 3 overwrites the real settings with meaningless numbers. The backup taken at step 2 is the way
-back: restore it before putting the PLC into Run.
+Tests 2 and 3 overwrite the plant with meaningless numbers — the whole of it in Test 3, one array
+in Test 2. The backup taken at the first step is the way back: restore it before putting the PLC
+into Run.

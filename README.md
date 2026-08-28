@@ -104,7 +104,8 @@ worked around.
 Two things fall out of this. The report now names the leaf — `GVL.Var.InInVar.IntInIn1: ads error
 ...` instead of just the variable — and array elements are addressed **by position** among the
 child symbols rather than by a computed index, which removes the `Dimensions mismatch!` failure on
-multidimensional arrays in the write path.
+multidimensional arrays in the write path, and turned out to agree with the order the backup
+flattens them into.
 
 The planner is a pure function, so the whole thing is testable without a PLC:
 `Tests/TwinCatAdsTool.Logic.Tests/PlcLeafPlannerTests.cs`.
@@ -632,13 +633,14 @@ picking every difference at once, a value inside an array, and moving between di
 filter both on and off. Nobody has yet run the command line from a scheduled task, and its `compare`
 verb has not been exercised on a plant.
 
+On a second plant, an `ARRAY[0..30, 0..30] OF DUT_Cass` — **92,256 leaves in a single variable** —
+restored with 92,256 correct and none out of place, which settles the multidimensional case: the
+backup flattens such an array into a single list, and the flattening and the write path agree on the
+order. Test 2 in [docs/RESTORE-VERIFICATION.md](docs/RESTORE-VERIFICATION.md).
+
 **Not verified**: the accuracy of scope timings below roughly ten milliseconds — the samples are
 stamped when they reach the pc, not when the PLC changed them, so short events are ordered correctly
-but not measured. And multidimensional arrays (`ARRAY[0..n,0..m]`), which the plant used for the
-verification does not contain. The write path addresses elements by position and can no longer
-raise `Dimensions mismatch!`, but whether the backup's flattened form lines up with the order of
-the child symbols has not been measured. Test 2 in
-[docs/RESTORE-VERIFICATION.md](docs/RESTORE-VERIFICATION.md) covers it.
+but not measured. Of the multidimensional case, one shape only: square, rank 2.
 
 ---
 
@@ -671,8 +673,8 @@ the shape of the variable involved.
 Issues about the original tool rather than about the changes in this fork belong
 [upstream](https://github.com/fbarresi/TwinCatAdsTool/issues).
 
-The most useful report anyone could send is a restore onto a plant that uses **multidimensional
-arrays**, which is the one case listed above as unverified.
+The most useful report anyone could send is a restore onto a plant whose persistent variables have
+a shape none of the verifications covers — a **rank 3 array**, or a non square `ARRAY[0..n,0..m]`.
 
 ## Requirements
 

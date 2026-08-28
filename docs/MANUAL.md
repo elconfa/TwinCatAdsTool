@@ -543,11 +543,11 @@ and restore from the command line against a running controller.
 
 **Verified by test**: 154 unit tests on every build.
 
-**Not verified**: multidimensional arrays, `ARRAY[0..n,0..m]`, which the installation used for the
-verification does not contain. The write path addresses elements by position and can no longer raise
-a dimension mismatch, but whether the flattened form in the file lines up with the order of the child
-symbols has not been measured. Also unverified: the accuracy of scope timings below roughly ten
-milliseconds, and `compare` from the command line against a plant.
+Multidimensional arrays, `ARRAY[0..n,0..m]`, are covered too, on a second plant: an
+`ARRAY[0..30, 0..30] OF DUT_Cass`, **92,256 leaves in one variable**, restored with 92,256 correct
+and none out of place. The backup flattens such an array into a single list, and this is what says
+that the flattening and the write path agree on the order.
 
-If you have a machine with multidimensional persistent arrays, a restore on it is the single most
-useful thing anyone could report.
+**Not verified**: the accuracy of scope timings below roughly ten milliseconds, and `compare` from
+the command line against a plant. Of the multidimensional case, only one shape has been exercised —
+square, rank 2; rank 3 or a non square array would test the flattening further.
