@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Ninject;
 using TwinCatAdsTool.Interfaces;
+using TwinCatAdsTool.Interfaces.Comparison;
 using TwinCatAdsTool.Interfaces.Models;
 using TwinCatAdsTool.Interfaces.Services;
 using TwinCatAdsTool.Logic.Cli;

@@ -10,237 +10,21 @@
              d:DesignHeight="600" d:DesignWidth="900">
     <UserControl.Resources>
         <!--
-            The row owns its colours and stretches across the whole width. Handing the view ready
-            made ListBoxItem controls, as this used to do, meant the list wrapped each one in a
-            container of its own whose style decided the width and the background - which is why
-            the differences ended up not showing.
+            The stripe down the left of a row. Colour on a cell background has to survive whatever
+            the theme paints over it; a border of its own always renders, so the kind of a
+            difference is readable whichever theme and whichever wpf ui version is in force.
         -->
-        <DataTemplate x:Key="DiffLineTemplate" DataType="{x:Type models:DiffLine}">
-            <Border x:Name="Row"
-                    Height="20"
-                    Background="Transparent"
-                    BorderBrush="Transparent"
-                    BorderThickness="3,0,0,0">
-                <TextBlock Text="{Binding Text}"
-                           VerticalAlignment="Center"
-                           Margin="6,0,0,0" />
-            </Border>
-            <DataTemplate.Triggers>
-                <!--  Translucent fills: they read the same on a dark and on a light background.  -->
-                <DataTrigger Binding="{Binding Kind}" Value="Inserted">
-                    <Setter TargetName="Row" Property="Background" Value="#3810893E" />
-                    <Setter TargetName="Row" Property="BorderBrush" Value="#FF10893E" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Kind}" Value="Deleted">
-                    <Setter TargetName="Row" Property="Background" Value="#38E81123" />
-                    <Setter TargetName="Row" Property="BorderBrush" Value="#FFE81123" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Kind}" Value="Modified">
-                    <Setter TargetName="Row" Property="Background" Value="#38F7630C" />
-                    <Setter TargetName="Row" Property="BorderBrush" Value="#FFF7630C" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Kind}" Value="Filler">
-                    <Setter TargetName="Row" Property="Background" Value="#14808080" />
-                </DataTrigger>
-            </DataTemplate.Triggers>
-        </DataTemplate>
-
-        <!--
-            No selection chrome and no padding of its own: a diff row is read, not picked, and
-            anything the container drew would sit on top of the colour that carries the meaning.
-        -->
-        <Style x:Key="DiffRow" TargetType="ListBoxItem">
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <ContentPresenter HorizontalAlignment="Stretch" />
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!--
-            Scrollbars of their own rather than the ones wpf ui draws, which are a few pixels wide
-            and only widen once the pointer is already on them - too fine a target for a pane that
-            is scrolled constantly. Colours stay theme aware through DynamicResource.
-
-            Every piece below is handed to its user by key. An implicit style cannot do this job:
-            the scroll viewer template that wpf ui applies names its scrollbars PART_VerticalScrollBar
-            and gives each one a style of its own, and an explicit style always wins over an implicit
-            one - so a Width declared implicitly never took part in the decision at all.
-        -->
-        <Style x:Key="DiffScrollBarThumb" TargetType="Thumb">
-            <Setter Property="OverridesDefaultStyle" Value="True" />
-            <Setter Property="IsTabStop" Value="False" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Thumb">
-                        <Border Background="{DynamicResource TextFillColorSecondaryBrush}"
-                                CornerRadius="{StaticResource SmallCornerRadius}"
-                                Margin="3" />
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!--  Clicking the empty part of the track pages up or down; it draws nothing of its own.  -->
-        <Style x:Key="DiffScrollBarPage" TargetType="RepeatButton">
-            <Setter Property="OverridesDefaultStyle" Value="True" />
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="IsTabStop" Value="False" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="RepeatButton">
-                        <Border Background="Transparent" />
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <ControlTemplate x:Key="DiffScrollBarVertical" TargetType="ScrollBar">
-            <Border Background="{DynamicResource ControlFillColorDefaultBrush}">
-                <Track x:Name="PART_Track" IsDirectionReversed="True">
-                    <Track.DecreaseRepeatButton>
-                        <RepeatButton Style="{StaticResource DiffScrollBarPage}" Command="ScrollBar.PageUpCommand" />
-                    </Track.DecreaseRepeatButton>
-                    <Track.Thumb>
-                        <Thumb Style="{StaticResource DiffScrollBarThumb}" />
-                    </Track.Thumb>
-                    <Track.IncreaseRepeatButton>
-                        <RepeatButton Style="{StaticResource DiffScrollBarPage}" Command="ScrollBar.PageDownCommand" />
-                    </Track.IncreaseRepeatButton>
-                </Track>
-            </Border>
-        </ControlTemplate>
-
-        <ControlTemplate x:Key="DiffScrollBarHorizontal" TargetType="ScrollBar">
-            <Border Background="{DynamicResource ControlFillColorDefaultBrush}">
-                <Track x:Name="PART_Track" Orientation="Horizontal">
-                    <Track.DecreaseRepeatButton>
-                        <RepeatButton Style="{StaticResource DiffScrollBarPage}" Command="ScrollBar.PageLeftCommand" />
-                    </Track.DecreaseRepeatButton>
-                    <Track.Thumb>
-                        <Thumb Style="{StaticResource DiffScrollBarThumb}" />
-                    </Track.Thumb>
-                    <Track.IncreaseRepeatButton>
-                        <RepeatButton Style="{StaticResource DiffScrollBarPage}" Command="ScrollBar.PageRightCommand" />
-                    </Track.IncreaseRepeatButton>
-                </Track>
-            </Border>
-        </ControlTemplate>
-
-        <!--  Named, so that the scroll viewer template below can hand it over explicitly.  -->
-        <Style x:Key="DiffScrollBar" TargetType="ScrollBar">
-            <Setter Property="OverridesDefaultStyle" Value="True" />
-            <Setter Property="Width" Value="16" />
-            <Setter Property="MinWidth" Value="16" />
-            <Setter Property="Template" Value="{StaticResource DiffScrollBarVertical}" />
-            <Style.Triggers>
-                <Trigger Property="Orientation" Value="Horizontal">
-                    <Setter Property="Width" Value="Auto" />
-                    <Setter Property="MinWidth" Value="0" />
-                    <Setter Property="Height" Value="16" />
-                    <Setter Property="MinHeight" Value="16" />
-                    <Setter Property="Template" Value="{StaticResource DiffScrollBarHorizontal}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <!--
-            The pane owns its scroll viewer outright. Leaving a bare ScrollViewer to be styled by
-            whatever the theme provides is what put wpf ui's own template back in place, scrollbars
-            included; an explicit style is the only way to keep it out.
-
-            PART_ScrollContentPresenter, PART_VerticalScrollBar and PART_HorizontalScrollBar are the
-            names ScrollViewer looks for when it wires itself up, so they are not free to change.
-        -->
-        <Style x:Key="DiffScroller" TargetType="ScrollViewer">
-            <Setter Property="OverridesDefaultStyle" Value="True" />
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ScrollViewer">
-                        <Grid Background="{TemplateBinding Background}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-
-                            <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
-                                                    Grid.Row="0" Grid.Column="0"
-                                                    CanContentScroll="{TemplateBinding CanContentScroll}"
-                                                    CanHorizontallyScroll="False"
-                                                    CanVerticallyScroll="False"
-                                                    Content="{TemplateBinding Content}"
-                                                    ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                    Margin="{TemplateBinding Padding}" />
-
-                            <ScrollBar x:Name="PART_VerticalScrollBar"
-                                       Grid.Row="0" Grid.Column="1"
-                                       Orientation="Vertical"
-                                       Cursor="Arrow"
-                                       Style="{StaticResource DiffScrollBar}"
-                                       Minimum="0"
-                                       Maximum="{TemplateBinding ScrollableHeight}"
-                                       ViewportSize="{TemplateBinding ViewportHeight}"
-                                       Value="{Binding VerticalOffset, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
-                                       Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}" />
-
-                            <ScrollBar x:Name="PART_HorizontalScrollBar"
-                                       Grid.Row="1" Grid.Column="0"
-                                       Orientation="Horizontal"
-                                       Cursor="Arrow"
-                                       Style="{StaticResource DiffScrollBar}"
-                                       Minimum="0"
-                                       Maximum="{TemplateBinding ScrollableWidth}"
-                                       ViewportSize="{TemplateBinding ViewportWidth}"
-                                       Value="{Binding HorizontalOffset, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
-                                       Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}" />
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!--
-            Virtualised and scrolling by line. A backup of a real plant is well over ten thousand
-            lines: realising them all is what made the wheel feel dead. Scrolling by line rather
-            than by pixel also keeps the two panes exactly aligned, since every row is 20 high.
-        -->
-        <Style x:Key="DiffPane" TargetType="ListBox">
-            <Setter Property="FontFamily" Value="{StaticResource MonoFontFamily}" />
-            <Setter Property="FontSize" Value="12" />
+        <Style x:Key="KindStripe" TargetType="Border">
+            <Setter Property="Width" Value="4" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="CornerRadius" Value="2" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="ItemTemplate" Value="{StaticResource DiffLineTemplate}" />
-            <Setter Property="ItemContainerStyle" Value="{StaticResource DiffRow}" />
-            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
-            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
-            <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
-            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
-            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBox">
-                        <!--
-                            The scrollbar settings above are attached properties that inherit down
-                            the tree, so they reach this ScrollViewer without being restated.
-                        -->
-                        <ScrollViewer Style="{StaticResource DiffScroller}">
-                            <ItemsPresenter />
-                        </ScrollViewer>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        </Style>
+
+        <Style x:Key="ValueCell" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontFamily" Value="{StaticResource MonoFontFamily}" />
+            <Setter Property="Margin" Value="6,0" />
         </Style>
     </UserControl.Resources>
 
@@ -254,6 +38,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -263,26 +48,40 @@
                    FontWeight="SemiBold"
                    Margin="0,0,0,4" />
 
-        <!--  Whether anything differs at all is the first thing the user wants to know.  -->
-        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
-                    Orientation="Horizontal"
-                    Margin="0,0,0,16"
-                    Visibility="{Binding HasComparison, Converter={StaticResource VisibleIfTrue}}">
-            <ui:InfoBadge Severity="Success"
-                          VerticalAlignment="Center"
-                          Margin="0,0,8,0"
-                          Visibility="{Binding AreIdentical, Converter={StaticResource VisibleIfTrue}}" />
-            <ui:InfoBadge Severity="Caution"
-                          VerticalAlignment="Center"
-                          Margin="0,0,8,0"
-                          Visibility="{Binding AreIdentical, Converter={StaticResource VisibleIfFalse}}" />
-            <TextBlock Text="The two sides are identical"
-                       VerticalAlignment="Center"
-                       Visibility="{Binding AreIdentical, Converter={StaticResource VisibleIfTrue}}" />
-            <TextBlock Text="{Binding DifferenceCount, StringFormat='{}{0} differing lines'}"
-                       FontWeight="SemiBold"
-                       VerticalAlignment="Center"
-                       Visibility="{Binding AreIdentical, Converter={StaticResource VisibleIfFalse}}" />
+        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,0,0,16">
+
+            <!--  Whether anything differs at all is the first thing the user wants to know.  -->
+            <StackPanel Orientation="Horizontal"
+                        Visibility="{Binding HasComparison, Converter={StaticResource VisibleIfTrue}}">
+                <ui:InfoBadge Severity="Success"
+                              VerticalAlignment="Center"
+                              Margin="0,0,8,0"
+                              Visibility="{Binding AreIdentical, Converter={StaticResource VisibleIfTrue}}" />
+                <ui:InfoBadge Severity="Caution"
+                              VerticalAlignment="Center"
+                              Margin="0,0,8,0"
+                              Visibility="{Binding AreIdentical, Converter={StaticResource VisibleIfFalse}}" />
+                <TextBlock Text="The two sides are identical"
+                           VerticalAlignment="Center"
+                           Visibility="{Binding AreIdentical, Converter={StaticResource VisibleIfTrue}}" />
+                <TextBlock Text="{Binding DifferenceCount, StringFormat='{}{0} values differ'}"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Visibility="{Binding AreIdentical, Converter={StaticResource VisibleIfFalse}}" />
+
+                <!--  Marks are not writes. Saying how many are waiting is what keeps that clear.  -->
+                <TextBlock Text="{Binding MarkedCount, StringFormat='{}, {0} picked to write'}"
+                           VerticalAlignment="Center"
+                           Margin="2,0,0,0"
+                           Visibility="{Binding HasMarks, Converter={StaticResource VisibleIfTrue}}" />
+            </StackPanel>
+
+            <!--  Says what is in the way - one side missing, no plc, no connection.  -->
+            <TextBlock Text="{Binding MergeHint}"
+                       Style="{StaticResource SecondaryText}"
+                       TextWrapping="Wrap"
+                       Margin="0,4,0,0"
+                       Visibility="{Binding HasMergeHint, Converter={StaticResource VisibleIfTrue}}" />
         </StackPanel>
 
         <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource SurfaceCard}" Margin="0,0,0,12" Padding="12">
@@ -313,20 +112,186 @@
             </StackPanel>
         </Border>
 
-        <Border Grid.Row="3" Grid.Column="0" Style="{StaticResource ContentSurface}">
-            <ListBox x:Name="LeftPane"
-                     ItemsSource="{Binding LeftLines}"
-                     Style="{StaticResource DiffPane}"
-                     PreviewMouseWheel="PaneWheel"
-                     ScrollViewer.ScrollChanged="PaneScrolled" />
+        <!--
+            Picking values, moving between them, and one deliberate action that writes. Nothing on
+            this bar touches the plc except the last button: a comparison that wrote as soon as an
+            arrow was clicked would be a comparison nobody could safely explore.
+        -->
+        <Border Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3"
+                Style="{StaticResource SurfaceCard}"
+                Margin="0,0,0,12" Padding="12"
+                Visibility="{Binding HasComparison, Converter={StaticResource VisibleIfTrue}}">
+            <StackPanel>
+                <WrapPanel>
+                    <ui:Button Command="{Binding CmdFirstChange}"
+                               Appearance="Transparent" Padding="8" Margin="0,0,2,4"
+                               ToolTip="First difference"
+                               Icon="{ui:SymbolIcon ChevronDoubleUp20}" />
+                    <ui:Button Command="{Binding CmdPreviousChange}"
+                               Appearance="Transparent" Padding="8" Margin="0,0,2,4"
+                               ToolTip="Previous difference"
+                               Icon="{ui:SymbolIcon ChevronUp24}" />
+                    <ui:Button Command="{Binding CmdNextChange}"
+                               Appearance="Transparent" Padding="8" Margin="0,0,2,4"
+                               ToolTip="Next difference"
+                               Icon="{ui:SymbolIcon ChevronDown24}" />
+                    <ui:Button Command="{Binding CmdLastChange}"
+                               Appearance="Transparent" Padding="8" Margin="0,0,16,4"
+                               ToolTip="Last difference"
+                               Icon="{ui:SymbolIcon ChevronDoubleDown20}" />
+
+                    <CheckBox IsChecked="{Binding OnlyDifferences, Mode=TwoWay}"
+                              Content="Only differences"
+                              VerticalAlignment="Center"
+                              Margin="0,0,16,4"
+                              ToolTip="Off, every value of the backup is listed, not only what changed" />
+
+                    <ui:Button Command="{Binding CmdCopyAllToLeft}"
+                               IsEnabled="{Binding CanMergeToLeft}"
+                               Appearance="Transparent" Padding="8,6" Margin="0,0,6,4"
+                               Content="All to left"
+                               ToolTip="Pick every difference to be taken from the right onto the left"
+                               Icon="{ui:SymbolIcon ArrowCircleLeft24}" />
+                    <ui:Button Command="{Binding CmdCopyAllToRight}"
+                               IsEnabled="{Binding CanMergeToRight}"
+                               Appearance="Transparent" Padding="8,6" Margin="0,0,6,4"
+                               Content="All to right"
+                               ToolTip="Pick every difference to be taken from the left onto the right"
+                               Icon="{ui:SymbolIcon ArrowCircleRight24}" />
+
+                    <ui:Button Command="{Binding CmdUndoAll}"
+                               IsEnabled="{Binding HasMarks}"
+                               Appearance="Transparent" Padding="8,6" Margin="0,0,16,4"
+                               Content="Undo all"
+                               ToolTip="Take back every pick. Nothing has been written yet"
+                               Icon="{ui:SymbolIcon ArrowUndo24}" />
+
+                    <ui:Button Command="{Binding CmdApply}"
+                               IsEnabled="{Binding CanApply}"
+                               Appearance="Primary" Padding="12,6" Margin="0,0,0,4"
+                               Content="Write to plc"
+                               ToolTip="Write the picked values, and nothing else, onto the plc"
+                               Icon="{ui:SymbolIcon ArrowUpload24}" />
+                </WrapPanel>
+            </StackPanel>
         </Border>
 
-        <Border Grid.Row="3" Grid.Column="2" Style="{StaticResource ContentSurface}">
-            <ListBox x:Name="RightPane"
-                     ItemsSource="{Binding RightLines}"
-                     Style="{StaticResource DiffPane}"
-                     PreviewMouseWheel="PaneWheel"
-                     ScrollViewer.ScrollChanged="PaneScrolled" />
+        <Border Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Style="{StaticResource ContentSurface}">
+            <ui:DataGrid x:Name="DifferenceGrid"
+                         ItemsSource="{Binding Rows}"
+                         SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                         SelectionChanged="RowSelected"
+                         AutoGenerateColumns="False"
+                         CanUserAddRows="False"
+                         IsReadOnly="True"
+                         SelectionMode="Single"
+                         SelectionUnit="FullRow"
+                         HeadersVisibility="Column"
+                         GridLinesVisibility="Horizontal"
+                         EnableRowVirtualization="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         Background="Transparent"
+                         BorderThickness="0">
+
+                <ui:DataGrid.Columns>
+
+                    <!--  The kind of difference, as a colour that is always drawn.  -->
+                    <DataGridTemplateColumn Header="" Width="Auto">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate DataType="{x:Type models:ValueDifference}">
+                                <Border x:Name="Stripe" Style="{StaticResource KindStripe}" />
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Changed">
+                                        <Setter TargetName="Stripe" Property="Background" Value="#FFF7630C" />
+                                        <Setter TargetName="Stripe" Property="ToolTip" Value="Both sides have this value and they disagree" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="OnlyOnLeft">
+                                        <Setter TargetName="Stripe" Property="Background" Value="#FFE81123" />
+                                        <Setter TargetName="Stripe" Property="ToolTip" Value="Only the left side has this value" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="OnlyOnRight">
+                                        <Setter TargetName="Stripe" Property="Background" Value="#FF10893E" />
+                                        <Setter TargetName="Stripe" Property="ToolTip" Value="Only the right side has this value" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!--  Which way this value has been picked to travel, once written.  -->
+                    <DataGridTemplateColumn Header="" Width="Auto">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate DataType="{x:Type models:ValueDifference}">
+                                <Grid Width="20">
+                                    <ui:SymbolIcon Symbol="ArrowCircleLeft20"
+                                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   ToolTip="Picked: the left is to take the value on the right"
+                                                   Visibility="Collapsed"
+                                                   x:Name="ToLeft" />
+                                    <ui:SymbolIcon Symbol="ArrowCircleRight20"
+                                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   ToolTip="Picked: the right is to take the value on the left"
+                                                   Visibility="Collapsed"
+                                                   x:Name="ToRight" />
+                                </Grid>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding Mark}" Value="ToLeft">
+                                        <Setter TargetName="ToLeft" Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Mark}" Value="ToRight">
+                                        <Setter TargetName="ToRight" Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!--
+                        The path is the whole point of comparing this way: it names one symbol on
+                        the plc, which is what a write has to be addressed to.
+                    -->
+                    <DataGridTextColumn Header="Variable" Width="*" Binding="{Binding Path}">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource ValueCell}">
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="Left" Width="Auto" MinWidth="90" Binding="{Binding LeftText}"
+                                        ElementStyle="{StaticResource ValueCell}" />
+
+                    <DataGridTemplateColumn Header="" Width="Auto">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate DataType="{x:Type models:ValueDifference}">
+                                <StackPanel Orientation="Horizontal"
+                                            Visibility="{Binding IsMergeable, Converter={StaticResource VisibleIfTrue}}">
+                                    <ui:Button Command="{Binding Path=DataContext.CmdCopyToLeft, RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}"
+                                               CommandParameter="{Binding}"
+                                               IsEnabled="{Binding Path=DataContext.CanMergeToLeft, RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}"
+                                               Appearance="Transparent"
+                                               Padding="6" Margin="2"
+                                               ToolTip="Take the value on the right onto the left. Click again to take it back"
+                                               Icon="{ui:SymbolIcon ArrowCircleLeft20}" />
+                                    <ui:Button Command="{Binding Path=DataContext.CmdCopyToRight, RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}"
+                                               CommandParameter="{Binding}"
+                                               IsEnabled="{Binding Path=DataContext.CanMergeToRight, RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}"
+                                               Appearance="Transparent"
+                                               Padding="6" Margin="2"
+                                               ToolTip="Take the value on the left onto the right. Click again to take it back"
+                                               Icon="{ui:SymbolIcon ArrowCircleRight20}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Header="Right" Width="Auto" MinWidth="90" Binding="{Binding RightText}"
+                                        ElementStyle="{StaticResource ValueCell}" />
+
+                </ui:DataGrid.Columns>
+            </ui:DataGrid>
         </Border>
     </Grid>
 </UserControl>

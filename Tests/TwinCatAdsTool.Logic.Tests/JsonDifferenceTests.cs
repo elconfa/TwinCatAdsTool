@@ -1,6 +1,6 @@
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using System.Linq;
-using TwinCatAdsTool.Logic.Cli;
+using TwinCatAdsTool.Interfaces.Comparison;
 using Xunit;
 
 namespace TwinCatAdsTool.Logic.Tests
@@ -128,6 +128,56 @@ namespace TwinCatAdsTool.Logic.Tests
             var found = JsonDifference.Find(Json("{'a':1,'b':2,'c':3}"), Json("{'a':9,'b':2,'c':9}"));
 
             Assert.Equal(new[] { "a", "c" }, found.Select(entry => entry.Path));
+        }
+
+        /// <summary>
+        /// The comparison window offers to show the whole backup and not only what differs, so the
+        /// same walk has to be able to hand back every leaf with a mark against the ones that
+        /// disagree. The command line keeps using Find, which allocates nothing for the agreements.
+        /// </summary>
+        [Fact]
+        public void Comparing_lists_every_leaf_and_says_which_ones_differ()
+        {
+            var all = JsonDifference.Compare(Json("{'a':1,'b':2,'c':3}"), Json("{'a':9,'b':2,'c':3}"));
+
+            Assert.Equal(new[] { "a", "b", "c" }, all.Select(entry => entry.Path));
+            Assert.Equal(new[] { true, false, false }, all.Select(entry => entry.IsDifferent));
+        }
+
+        [Fact]
+        public void A_leaf_present_on_one_side_only_is_named_after_the_side_that_has_it()
+        {
+            var onlyLeft = JsonDifference.Find(Json("{'a':1,'b':2}"), Json("{'a':1}")).Single();
+            var onlyRight = JsonDifference.Find(Json("{'a':1}"), Json("{'a':1,'b':2}")).Single();
+
+            Assert.Equal(JsonDifferenceKind.OnlyOnLeft, onlyLeft.Kind);
+            Assert.Equal(JsonDifferenceKind.OnlyOnRight, onlyRight.Kind);
+        }
+
+        /// <summary>
+        /// Only a leaf both sides hold can be carried across. Writing one that exists on a single
+        /// side would mean declaring a symbol on the plc, which ads cannot do - so the window must
+        /// not offer it rather than offer it and fail.
+        /// </summary>
+        [Fact]
+        public void Only_a_leaf_both_sides_hold_can_be_carried_across()
+        {
+            Assert.True(JsonDifference.Find(Json("{'a':1}"), Json("{'a':2}")).Single().IsMergeable);
+            Assert.False(JsonDifference.Find(Json("{'a':1,'b':2}"), Json("{'a':1}")).Single().IsMergeable);
+            Assert.False(JsonDifference.Find(Json("{'a':1}"), Json("{'a':1,'b':2}")).Single().IsMergeable);
+        }
+
+        /// <summary>
+        /// The path of an element is the position in the json array, which the restore then uses to
+        /// address the element by position as well. It is not the index the plc declares: a backup
+        /// does not record the lower bound of an array, so nothing here could reconstruct it.
+        /// </summary>
+        [Fact]
+        public void An_element_is_named_by_its_position_in_the_array()
+        {
+            var found = JsonDifference.Find(Json("{'a':[1,2,3]}"), Json("{'a':[1,2,9]}")).Single();
+
+            Assert.Equal("a[2]", found.Path);
         }
     }
 }

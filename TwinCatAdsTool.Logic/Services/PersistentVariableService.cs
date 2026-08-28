@@ -10,6 +10,7 @@ using TwinCAT.TypeSystem;
 using TwinCAT.TypeSystem.Generic;
 using TwinCatAdsTool.Interfaces.Models;
 using TwinCatAdsTool.Interfaces.Services;
+using TwinCatAdsTool.Logic.Values;
 
 namespace TwinCatAdsTool.Logic.Services
 {
@@ -30,7 +31,13 @@ namespace TwinCatAdsTool.Logic.Services
             IEnumerable<ISymbol> symbols,
             JObject backup,
             CancellationToken cancel = default)
-            => writer.WriteAsync(client, symbols, backup, Progress(), cancel);
+            => writer.WriteAsync(client, symbols, backup, PlanScope.WholeVariable, Progress(), cancel);
+
+        public Task<PersistentOperationReport> WriteSelectedValues(AdsClient client,
+            IEnumerable<ISymbol> symbols,
+            JObject values,
+            CancellationToken cancel = default)
+            => writer.WriteAsync(client, symbols, values, PlanScope.OnlyValuesPresent, Progress(), cancel);
 
         [Obsolete("Use ReadPersistentVariables, which also reports the variables that could not be read.")]
         public async Task<JObject> ReadGlobalPersistentVariables(AdsClient client, IInstanceCollection<ISymbol> symbols)

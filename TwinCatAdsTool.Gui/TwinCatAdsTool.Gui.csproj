@@ -13,7 +13,6 @@
     <PackageReference Include="DynamicData" Version="9.4.33" />
     <Resource Include="Resources\evopro.png" />
     <PackageReference Include="Beckhoff.TwinCAT.Ads.Reactive" Version="7.0.317" />
-    <PackageReference Include="DiffPlex" Version="1.9.0" />
     <PackageReference Include="Extended.Wpf.Toolkit" Version="5.1.2" />
     <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />

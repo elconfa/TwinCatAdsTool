@@ -1,4 +1,4 @@
-<UserControl x:Class="TwinCatAdsTool.Gui.Views.HelpView"
+﻿<UserControl x:Class="TwinCatAdsTool.Gui.Views.HelpView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -85,7 +85,7 @@
                         </TextBlock>
                         <TextBlock Style="{StaticResource HelpRow}">
                             <Run FontWeight="SemiBold">Compare</Run>
-                            <Run Text=" puts two sides next to each other, each of them either the live PLC or a file. This is how a restore is checked: restore, read the plant back, compare." />
+                            <Run Text=" puts two sides next to each other, each of them either the live PLC or a file, and compares them value by value rather than as text. This is how a restore is checked: restore, read the plant back, compare. Where a value differs, the arrows on the row pick it to be carried across; picking is not writing, and only the Write to plc button touches the machine. Values are only ever written to the PLC, never into a file." />
                         </TextBlock>
                         <TextBlock Style="{StaticResource HelpRow}">
                             <Run FontWeight="SemiBold">Explore</Run>

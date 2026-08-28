@@ -208,11 +208,60 @@ has changed since. That distinction cost a wrong conclusion once already.
 - two files, for instance last month's backup against today's
 - the plant against a file taken from another machine of the same type
 
-The count of differing lines is shown at the top. Differences are coloured: added, removed, changed.
-Both panes scroll together, with the wheel or the scrollbar.
+The comparison is made **value by value**, not as text. Every row is one symbol on the PLC, named by
+its path, with the reading each side holds. The count at the top says how many values differ, and a
+coloured stripe on each row says how:
 
-The comparison is textual, line by line. The command line's `compare` instead compares leaf by leaf
-and names each difference by its path, which is the better answer when there are many.
+| | |
+|---|---|
+| orange | both sides have this value and they disagree |
+| red | only the left side has it |
+| green | only the right side has it |
+
+A value that exists on one side only usually means the PLC program has changed since the backup was
+taken: a variable was added, removed or renamed.
+
+### Finding the differences
+
+**Only differences** is on to begin with, so the list holds nothing but what changed. Turn it off and
+every value of the backup is listed — which is how you confirm that a value has *not* moved, rather
+than only seeing the ones that have.
+
+The four chevrons move between differences: first, previous, next, last. With the filter off they
+skip past everything the two sides agree on.
+
+### Correcting the PLC from the other side
+
+Where a value differs and both sides have it, the two arrows in the middle of the row offer to carry
+it across. Clicking an arrow **picks** the value; it does not write it. Clicking the same arrow again
+takes the pick back.
+
+- **All to left** / **All to right** picks every difference at once
+- **Undo all** drops every pick
+- **Write to plc** is the only thing that touches the machine, and it asks first
+
+The top of the tab says how many values are picked and waiting. Nothing is sent until you press
+*Write to plc* and confirm.
+
+**Only the PLC is written to.** A backup file is left exactly as it was found. So the direction that
+is open depends on which side you filled from the PLC: read the plant into the left and values travel
+left, into the right and they travel right. If neither side came from the PLC, the arrows are dead
+and a line under the count says so.
+
+A value only one side has cannot be carried across, and no arrows are offered for it. Writing it
+would mean creating a variable on the PLC, and ADS writes values — it does not declare symbols.
+
+After the write the PLC side is read back automatically, so what is on screen is what is on the
+machine, including anything the write could not place.
+
+### What it writes, and what it leaves alone
+
+Exactly the values you picked. The variables you did not touch are not read, not written and not
+reported: a merge of three values says three values, not "eleven thousand skipped".
+
+The write goes through the same machinery as a restore, so a value that cannot be placed — the PLC
+declares it read only, the type no longer fits, the variable no longer exists — is reported by name
+rather than silently dropped.
 
 ---
 

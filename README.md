@@ -26,6 +26,7 @@ backup tab; the explore tab is [further down](#the-explore-tab-is-now-a-scope).
 | [What got faster](#what-got-faster) | A backup from ten minutes to 0.1 s, a restore from 11.4 s to 1.9 s, and where the time actually went |
 | [Evidence](#evidence-a-full-round-trip-on-a-real-plant) | 10,978 leaves written and read back, one by one, on a real installation |
 | [The explore tab is now a scope](#the-explore-tab-is-now-a-scope) | Stop, scroll back, zoom, trigger, export, watch sets |
+| [The compare tab can repair](#the-compare-tab-can-repair) | Pick differences one by one and write just those onto the PLC |
 | [Command line](#command-line) | Backup, restore and compare without the window, for scheduled tasks and scripts |
 | [Modernisation](#modernisation) | .NET 8, ADS 7 for TwinCAT 4024 and 4026, the Fluent interface |
 | [What is verified, and what is not](#what-is-verified-and-what-is-not) | Measured, tested, and honestly untested |
@@ -418,6 +419,43 @@ trip back to the project.
 
 ---
 
+## The compare tab can repair
+
+Comparing used to end where it got interesting. Two backups were put side by side as **text**, and
+that is a different question from the one being asked: a textual diff of two json files reports how
+the files were *written* — key order, spacing, whether a number was printed as `1` or `1.0` — as
+though the plant had changed. Worse, a line of a diff names nothing. You could see that something was
+wrong and then had to go and fix it by hand, in another tab, one value at a time.
+
+It now compares **leaf by leaf**, the same way the command line's `compare` always did. Every row is
+one symbol on the PLC, named by its path — and because a row names a symbol, a row can be acted on.
+
+| | |
+|---|---|
+| **Pick a difference** | The two arrows on a row send that value one way or the other |
+| **Pick all of them** | *All to left* / *All to right*, for a wholesale correction |
+| **Move between them** | First, previous, next, last — instead of hunting through thousands of rows |
+| **Only differences** | On by default. Off, every value of the backup is listed, which is how you confirm that a value has *not* moved |
+| **Undo all** | Takes back every pick. Nothing has been written yet |
+| **Write to plc** | One deliberate action, after a confirmation that says how many values it will write |
+
+Picking is not writing. Marks are collected, counted at the top of the tab and can be dropped
+wholesale, and only the last button touches the machine — which is the only safe order when the other
+end of the cable is running.
+
+**Differences are written to the PLC only.** A backup file is left exactly as it was found, so the
+direction that is open depends on which side you filled from the PLC: if the plant is on the left,
+values travel left. A value that exists on only one side is shown, and greyed out rather than
+offered: bringing it across would mean declaring a symbol on the PLC, and ADS writes values, it does
+not create variables.
+
+The write goes through the same path as a restore — the same leaf addressing, the same sum commands,
+the same report — with one difference: it is told that the values it was given are the whole of what
+was asked for, so the thousands of variables it did not touch are not reported as missing. What it
+writes is exactly what was picked, and nothing else on the PLC is read into the bargain.
+
+---
+
 ## Command line
 
 Everything the backup and restore tabs do can be asked for without opening the window, so a backup
@@ -505,9 +543,11 @@ saying out loud.
 ### Coming from the Symbol Explorer
 
 Beckhoff's [Symbol Explorer](https://infosys.beckhoff.com/content/1033/tf8040_tc3_buildingautomation/9231016331.html),
-part of TF8040 TwinCAT 3 Building Automation, does much of this and more — merging in the compare
-view, regular expressions over the symbol list, integration with the XAE Shell. If you have TF8040,
-you already have it, and for managing snapshots it is the better tool.
+part of TF8040 TwinCAT 3 Building Automation, does much of this and more — comparing two live
+controllers against each other, regular expressions over the symbol list, search and replace,
+integration with the XAE Shell. If you have TF8040, you already have it. Picking differences out of a
+comparison and writing them back, which it has had for years, is the feature this tool copied most
+directly.
 
 `--SnapShotFromPlc`, `--SyncPlcToSnapShot` and `--SyncSnapShotToPlc` are accepted here as spellings of
 `backup`, `backup` and `restore`, so a script written against it can be pointed at this without being
@@ -580,14 +620,17 @@ Details, and the parts that are deliberately unchanged, in [docs/UI-FLUENT.md](d
 restore of 10,978 leaves in 2.5 s with every leaf correct; nested branches, arrays of structures,
 arrays inside structures inside arrays, strings, REALs, BOOLs, TIME, LTIME and DT.
 
-**Verified by test**: 154 unit tests, run on every build. Thirty-five cover the scope — the recording
+**Verified by test**: 187 unit tests, run on every build. Thirty-five cover the scope — the recording
 buffer and the sample that has to be carried in from before the window, the table a capture is
-exported as, the trigger conditions — and forty-one cover the command line: what it accepts and
-refuses, and the leaf by leaf comparison behind `compare`.
+exported as, the trigger conditions — forty-one cover the command line, and thirty-three cover
+comparing and merging: the leaf by leaf comparison, cutting a backup down to chosen values, and the
+whole way a picked difference travels from the row it is shown on to the symbol it is written to.
 
 **Verified on a real PLC, by hand**: `backup` and `restore` from the command line against a running
-controller. Nobody has yet run either from a scheduled task, and `compare` has not been exercised on
-a plant.
+controller. In the compare tab, against a live PLC: picking single differences and writing them,
+picking every difference at once, a value inside an array, and moving between differences with the
+filter both on and off. Nobody has yet run the command line from a scheduled task, and its `compare`
+verb has not been exercised on a plant.
 
 **Not verified**: the accuracy of scope timings below roughly ten milliseconds — the samples are
 stamped when they reach the pc, not when the PLC changed them, so short events are ordered correctly

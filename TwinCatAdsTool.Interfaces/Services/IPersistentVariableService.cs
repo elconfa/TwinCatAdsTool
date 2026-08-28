@@ -30,6 +30,20 @@ namespace TwinCatAdsTool.Interfaces.Services
             JObject backup,
             CancellationToken cancel = default);
 
+        /// <summary>
+        /// Writes only the values the given json actually holds, leaving everything else on the plc
+        /// alone. The json is shaped like a backup - same nesting, arrays of the same length - with
+        /// a null wherever a value was not asked for.
+        ///
+        /// This is how the comparison carries chosen differences onto the plc. It deliberately does
+        /// not report what it left out: a subset names exactly what was wanted, so the variables and
+        /// the members it does not mention are not omissions.
+        /// </summary>
+        Task<PersistentOperationReport> WriteSelectedValues(AdsClient client,
+            IEnumerable<ISymbol> symbols,
+            JObject values,
+            CancellationToken cancel = default);
+
         [Obsolete("Use ReadPersistentVariables, which also reports the variables that could not be read.")]
         Task<JObject> ReadGlobalPersistentVariables(AdsClient client, IInstanceCollection<ISymbol> symbols);
 

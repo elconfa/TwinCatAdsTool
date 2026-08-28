@@ -51,6 +51,24 @@ namespace TwinCatAdsTool.Logic.Values
         public object Value { get; }
     }
 
+    /// <summary>How much of the plc variable the json is expected to account for.</summary>
+    public enum PlanScope
+    {
+        /// <summary>
+        /// The json is a whole backup of this variable. Anything the plc declares and the json does
+        /// not hold is a mismatch worth reporting: a restore that silently left members untouched is
+        /// the kind of thing that is only discovered on the machine.
+        /// </summary>
+        WholeVariable,
+
+        /// <summary>
+        /// The json holds only some of the values on purpose, the rest being json null. Used when a
+        /// comparison writes a few chosen differences back onto the plc: everything absent was
+        /// deliberately not asked for, so it is skipped rather than reported.
+        /// </summary>
+        OnlyValuesPresent
+    }
+
     public class PlcLeafPlan
     {
         public PlcLeafPlan(IReadOnlyList<PlcLeafWrite> writes, IReadOnlyList<string> mismatches)
@@ -86,18 +104,19 @@ namespace TwinCatAdsTool.Logic.Values
     /// </summary>
     public static class PlcLeafPlanner
     {
-        public static PlcLeafPlan Plan(IPlcValueNode current, JToken json, string path)
+        public static PlcLeafPlan Plan(IPlcValueNode current, JToken json, string path,
+            PlanScope scope = PlanScope.WholeVariable)
         {
             var writes = new List<PlcLeafWrite>();
             var mismatches = new List<string>();
 
-            Walk(current, json, path ?? string.Empty, new List<PlcPathStep>(), writes, mismatches);
+            Walk(current, json, path ?? string.Empty, new List<PlcPathStep>(), writes, mismatches, scope);
 
             return new PlcLeafPlan(writes, mismatches);
         }
 
         private static void Walk(IPlcValueNode current, JToken json, string path,
-            List<PlcPathStep> steps, List<PlcLeafWrite> writes, List<string> mismatches)
+            List<PlcPathStep> steps, List<PlcLeafWrite> writes, List<string> mismatches, PlanScope scope)
         {
             if (current == null)
             {
@@ -107,19 +126,25 @@ namespace TwinCatAdsTool.Logic.Values
 
             if (json == null || json.Type == JTokenType.Null)
             {
-                mismatches.Add($"{path}: no value in the backup file");
+                // A null is the absence of a request when only part of the variable is being
+                // written, and a hole in the file when the whole of it should have been there.
+                if (scope == PlanScope.WholeVariable)
+                {
+                    mismatches.Add($"{path}: no value in the backup file");
+                }
+
                 return;
             }
 
             if (current.IsArray)
             {
-                WalkArray(current, json, path, steps, writes, mismatches);
+                WalkArray(current, json, path, steps, writes, mismatches, scope);
                 return;
             }
 
             if (current.IsStruct)
             {
-                WalkStruct(current, json, path, steps, writes, mismatches);
+                WalkStruct(current, json, path, steps, writes, mismatches, scope);
                 return;
             }
 
@@ -127,7 +152,7 @@ namespace TwinCatAdsTool.Logic.Values
         }
 
         private static void WalkArray(IPlcValueNode current, JToken json, string path,
-            List<PlcPathStep> steps, List<PlcLeafWrite> writes, List<string> mismatches)
+            List<PlcPathStep> steps, List<PlcLeafWrite> writes, List<string> mismatches, PlanScope scope)
         {
             if (!(json is JArray array))
             {
@@ -149,13 +174,13 @@ namespace TwinCatAdsTool.Logic.Values
                 var declaredIndex = current.ArrayLowerBound + i;
 
                 steps.Add(PlcPathStep.Element(i));
-                Walk(elements[i], array[i], $"{path}[{declaredIndex}]", steps, writes, mismatches);
+                Walk(elements[i], array[i], $"{path}[{declaredIndex}]", steps, writes, mismatches, scope);
                 steps.RemoveAt(steps.Count - 1);
             }
         }
 
         private static void WalkStruct(IPlcValueNode current, JToken json, string path,
-            List<PlcPathStep> steps, List<PlcLeafWrite> writes, List<string> mismatches)
+            List<PlcPathStep> steps, List<PlcLeafWrite> writes, List<string> mismatches, PlanScope scope)
         {
             if (!(json is JObject obj))
             {
@@ -173,7 +198,11 @@ namespace TwinCatAdsTool.Logic.Values
 
                 if (property == null)
                 {
-                    mismatches.Add($"{memberPath}: missing in the backup file, left unchanged on the plc");
+                    if (scope == PlanScope.WholeVariable)
+                    {
+                        mismatches.Add($"{memberPath}: missing in the backup file, left unchanged on the plc");
+                    }
+
                     continue;
                 }
 
@@ -184,7 +213,7 @@ namespace TwinCatAdsTool.Logic.Values
                 }
 
                 steps.Add(PlcPathStep.Member(name));
-                Walk(member, property.Value, memberPath, steps, writes, mismatches);
+                Walk(member, property.Value, memberPath, steps, writes, mismatches, scope);
                 steps.RemoveAt(steps.Count - 1);
             }
 

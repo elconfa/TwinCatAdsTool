@@ -47,33 +47,53 @@ namespace TwinCatAdsTool.Logic.Services
         private readonly ILog logger = LoggerFactory.GetLogger();
         private readonly PersistentSymbolScanner scanner = new PersistentSymbolScanner();
 
+        /// <param name="scope">Whether <paramref name="backup"/> is meant to account for the whole
+        /// of every variable it names, or holds only some of the values on purpose. A comparison that
+        /// writes a few chosen differences back onto the plc passes
+        /// <see cref="PlanScope.OnlyValuesPresent"/>: everything it leaves out was left out
+        /// deliberately, so it must not be reported as missing.</param>
         public async Task<PersistentOperationReport> WriteAsync(IAdsConnection connection,
             IEnumerable<ISymbol> symbols,
             JObject backup,
+            PlanScope scope,
             IProgress<OperationProgress> progress,
             CancellationToken cancel)
         {
+            var whole = scope == PlanScope.WholeVariable;
             var stopwatch = Stopwatch.StartNew();
             var results = new List<VariableOperationResult>();
             var phases = new Phases();
 
             var scan = scanner.Scan(symbols);
             phases.Scan = stopwatch.Elapsed;
-            results.AddRange(scan.Skipped);
+
+            // Variables the scan refused. When only a subset is being written, the ones it was
+            // never asked about are none of this run's business: reporting them would say a merge
+            // of three values was incomplete because of variables nobody touched.
+            results.AddRange(whole
+                ? scan.Skipped
+                : scan.Skipped.Where(skip => JsonPathBuilder.Find(backup, skip.InstancePath) != null));
 
             var matched = new List<ISymbol>();
             foreach (var symbol in scan.Roots)
             {
                 if (JsonPathBuilder.Find(backup, symbol.InstancePath) == null)
                 {
-                    results.Add(VariableOperationResult.Skipped(symbol.InstancePath,
-                        "not present in the backup file, left unchanged on the plc"));
+                    if (whole)
+                    {
+                        results.Add(VariableOperationResult.Skipped(symbol.InstancePath,
+                            "not present in the backup file, left unchanged on the plc"));
+                    }
+
                     continue;
                 }
 
                 matched.Add(symbol);
             }
 
+            // Reported whichever way this is called. An entry with nothing to match on the plc is a
+            // value that was asked for and cannot be delivered - which matters more, not less, when
+            // it was picked one at a time out of a comparison.
             results.AddRange(FindOrphans(backup, scan.Roots));
 
             var done = 0;
@@ -81,20 +101,22 @@ namespace TwinCatAdsTool.Logic.Services
             {
                 cancel.ThrowIfCancellationRequested();
                 progress?.Report(new OperationProgress(
-                    $"Writing {done + 1}-{done + batch.Count} of {matched.Count} persistent variables...",
+                    $"Writing {done + 1}-{done + batch.Count} of {matched.Count} " +
+                    (whole ? "persistent variables..." : "variables..."),
                     done,
                     matched.Count));
 
-                await WriteBatchAsync(connection, batch, backup, results, phases, cancel).ConfigureAwait(false);
+                await WriteBatchAsync(connection, batch, backup, scope, results, phases, cancel).ConfigureAwait(false);
                 done += batch.Count;
             }
 
             stopwatch.Stop();
             progress?.Report(OperationProgress.Idle);
 
+            var what = whole ? "Restore" : "Merge";
             var report = new PersistentOperationReport(results, stopwatch.Elapsed);
-            logger.Info($"Restore finished: {report.Summary}");
-            logger.Info($"Restore timing: {phases}");
+            logger.Info($"{what} finished: {report.Summary}");
+            logger.Info($"{what} timing: {phases}");
 
             return report;
         }
@@ -106,6 +128,7 @@ namespace TwinCatAdsTool.Logic.Services
         private async Task WriteBatchAsync(IAdsConnection connection,
             IReadOnlyList<ISymbol> batch,
             JObject backup,
+            PlanScope scope,
             List<VariableOperationResult> results,
             Phases phases,
             CancellationToken cancel)
@@ -138,7 +161,7 @@ namespace TwinCatAdsTool.Logic.Services
                 {
                     var node = new DynamicValueNode(current[i]);
                     var json = JsonPathBuilder.Find(backup, symbol.InstancePath);
-                    var plan = PlcLeafPlanner.Plan(node, json, symbol.InstancePath);
+                    var plan = PlcLeafPlanner.Plan(node, json, symbol.InstancePath, scope);
 
                     var rootPlan = new RootPlan(symbol);
                     rootPlan.Problems.AddRange(plan.Mismatches);

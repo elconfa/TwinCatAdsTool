@@ -290,5 +290,88 @@ namespace TwinCatAdsTool.Logic.Tests
             Assert.Empty(plan.Writes);
             Assert.Contains(plan.Mismatches, m => m.Contains("no value in the backup file"));
         }
+
+        /// <summary>
+        /// The comparison writes a handful of chosen values back onto the plc through this planner.
+        /// A subset is shaped like a backup with a null wherever a value was not asked for, so in
+        /// this scope a null is silence rather than a hole - the opposite of what it means when a
+        /// whole variable is being restored, which the test above pins down.
+        /// </summary>
+        [Fact]
+        public void Only_the_members_the_subset_holds_are_written_and_the_rest_are_not_reported()
+        {
+            var target = FakeValueNode.Struct(
+                ("Int1", FakeValueNode.Leaf((short) 157)),
+                ("Real1", FakeValueNode.Leaf(1.5f)),
+                ("Inner", FakeValueNode.Struct(("Value", FakeValueNode.Leaf(0)))));
+
+            var plan = PlcLeafPlanner.Plan(target,
+                JObject.Parse(@"{ ""Real1"": 9.5 }"),
+                "GVL.Data",
+                PlanScope.OnlyValuesPresent);
+
+            var write = Assert.Single(plan.Writes);
+            Assert.Equal("Real1", Describe(write));
+            Assert.Equal(9.5f, write.Value);
+            Assert.True(plan.IsClean);
+        }
+
+        [Fact]
+        public void A_null_in_a_subset_is_a_value_that_was_not_asked_for()
+        {
+            var target = FakeValueNode.Struct(
+                ("Inner", FakeValueNode.Struct(("Value", FakeValueNode.Leaf(0)))));
+
+            var plan = PlcLeafPlanner.Plan(target,
+                JObject.Parse(@"{ ""Inner"": null }"),
+                "GVL.Data",
+                PlanScope.OnlyValuesPresent);
+
+            Assert.Empty(plan.Writes);
+            Assert.True(plan.IsClean);
+        }
+
+        /// <summary>
+        /// The element has to land on the position the subset put it in. Writing it one place along
+        /// would put a value on the wrong axis, the wrong recipe or the wrong station, and nothing
+        /// downstream would notice.
+        /// </summary>
+        [Fact]
+        public void One_element_of_an_array_is_written_where_the_subset_left_it()
+        {
+            var target = FakeValueNode.Array(1,
+                FakeValueNode.Leaf((short) 0),
+                FakeValueNode.Leaf((short) 0),
+                FakeValueNode.Leaf((short) 0));
+
+            var plan = PlcLeafPlanner.Plan(target,
+                JArray.Parse("[null, 42, null]"),
+                "GVL.Values",
+                PlanScope.OnlyValuesPresent);
+
+            var write = Assert.Single(plan.Writes);
+            Assert.Equal("[1]", Describe(write));
+            Assert.Equal("GVL.Values[2]", write.Path);
+            Assert.Equal((short) 42, write.Value);
+            Assert.True(plan.IsClean);
+        }
+
+        /// <summary>
+        /// A subset names exactly what was asked for, so a name in it that the plc does not have is
+        /// a real problem and stays reported whichever scope is in force.
+        /// </summary>
+        [Fact]
+        public void A_value_the_plc_no_longer_has_is_still_reported_in_a_subset()
+        {
+            var target = FakeValueNode.Struct(("Int1", FakeValueNode.Leaf((short) 157)));
+
+            var plan = PlcLeafPlanner.Plan(target,
+                JObject.Parse(@"{ ""Gone"": 1 }"),
+                "GVL.Data",
+                PlanScope.OnlyValuesPresent);
+
+            Assert.Empty(plan.Writes);
+            Assert.Contains(plan.Mismatches, m => m.Contains("no longer exists on the plc"));
+        }
     }
 }
