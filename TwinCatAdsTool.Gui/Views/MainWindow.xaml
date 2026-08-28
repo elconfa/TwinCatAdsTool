@@ -104,6 +104,16 @@
                 </ui:NavigationViewItem>
             </ui:NavigationView.MenuItems>
 
+            <ui:NavigationView.FooterMenuItems>
+                <ui:NavigationViewItem Content="Help"
+                                       TargetPageType="{x:Type pages:HelpPage}"
+                                       ToolTip="What each tab does, and where the manual is">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="QuestionCircle24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+            </ui:NavigationView.FooterMenuItems>
+
             <ui:NavigationView.PaneFooter>
                 <ui:Button Command="{Binding ToggleTheme}"
                            ToolTip="{Binding ThemeToolTip}"

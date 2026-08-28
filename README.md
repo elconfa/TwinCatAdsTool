@@ -17,6 +17,21 @@ Dark by default, with a light theme a click away — the *Theme* button at the f
 panel switches between the two without a restart, and the choice is remembered. The shot is of the
 backup tab; the explore tab is [further down](#the-explore-tab-is-now-a-scope).
 
+## What is in here
+
+| | |
+|---|---|
+| **[Using it](docs/MANUAL.md)** | The manual: connecting, backing up, restoring, comparing, the scope, the command line, and what to do when something goes wrong. Also as a [PDF](docs/TwinCatAdsTool-Manual.pdf). |
+| [Why this fork exists](#why-this-fork-exists) | Six defects in the original backup and restore engine, with the evidence for each |
+| [What got faster](#what-got-faster) | A backup from ten minutes to 0.1 s, a restore from 11.4 s to 1.9 s, and where the time actually went |
+| [Evidence](#evidence-a-full-round-trip-on-a-real-plant) | 10,978 leaves written and read back, one by one, on a real installation |
+| [The explore tab is now a scope](#the-explore-tab-is-now-a-scope) | Stop, scroll back, zoom, trigger, export, watch sets |
+| [Command line](#command-line) | Backup, restore and compare without the window, for scheduled tasks and scripts |
+| [Modernisation](#modernisation) | .NET 8, ADS 7 for TwinCAT 4024 and 4026, the Fluent interface |
+| [What is verified, and what is not](#what-is-verified-and-what-is-not) | Measured, tested, and honestly untested |
+| [Download](#download) | Two builds, and which one you want |
+| [Reporting a problem](#reporting-a-problem) | Where to send it and what to include |
+
 ---
 
 ## Why this fork exists
@@ -594,7 +609,8 @@ same application:
 | `TwinCatAdsTool-<version>-win-x64-selfcontained.zip` | Nothing to install on the target machine. The obvious choice for a cabinet PC. |
 | `TwinCatAdsTool-<version>-win-x64.zip` | Much smaller, but needs the .NET 8 Desktop Runtime already present. |
 
-Unzip and run the executable; no installation. `log.config` beside it is optional — without it the
+Unzip and run the executable; no installation. The manual travels with it as a PDF, and the *Help*
+item at the foot of the navigation panel opens it. `log.config` beside it is optional — without it the
 application logs to `logs\` on its own, and the file is only there for anyone who wants to change
 the logging.
 
@@ -626,6 +642,7 @@ Both TwinCAT 4024 and 4026 are supported by the same build.
 
 | Document | Contents |
 |---|---|
+| [docs/MANUAL.md](docs/MANUAL.md) | **The manual.** How to use the tool, tab by tab, with the traps named. Also as a [PDF](docs/TwinCatAdsTool-Manual.pdf) |
 | [docs/PERSISTENT-BACKUP-RESTORE.md](docs/PERSISTENT-BACKUP-RESTORE.md) | The backup and restore engine: defects, fixes, design |
 | [docs/RESTORE-VERIFICATION.md](docs/RESTORE-VERIFICATION.md) | Field verification procedure and results |
 | [docs/UPGRADE-NET8.md](docs/UPGRADE-NET8.md) | .NET 8 and package upgrade, ADS 7 migration |

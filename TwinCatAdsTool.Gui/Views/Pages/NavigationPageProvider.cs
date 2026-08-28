@@ -43,7 +43,8 @@ namespace TwinCatAdsTool.Gui.Views.Pages
                 return WithDataContext(new ExplorePage(), tabs.ExploreViewModel);
             }
 
-            return null;
+            // The help holds no state and talks to no plc, so it is the one page with no view model.
+            return pageType == typeof(HelpPage) ? new HelpPage() : null;
         }
 
         private static FrameworkElement WithDataContext(FrameworkElement page, object dataContext)

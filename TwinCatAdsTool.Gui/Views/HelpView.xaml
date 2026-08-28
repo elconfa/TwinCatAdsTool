@@ -1,0 +1,164 @@
+<UserControl x:Class="TwinCatAdsTool.Gui.Views.HelpView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="900">
+    <UserControl.Resources>
+        <Style x:Key="HelpHeading" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+
+        <Style x:Key="HelpRow" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+
+        <Style x:Key="HelpKey" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFontFamily}" />
+            <Setter Property="Margin" Value="0,0,12,4" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="{StaticResource PagePadding}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="Help"
+                   FontSize="24"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,4" />
+
+        <TextBlock Grid.Row="1"
+                   Text="A quick reference. The full manual explains each of these properly."
+                   Style="{StaticResource SecondaryText}"
+                   Margin="0,0,0,12" />
+
+        <!--
+            The page fills the frame and the frame does not scroll, so the scrolling has to happen
+            here. See MainWindow.LetThePageFillTheFrame for why the frame does not.
+        -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+
+                <Border Style="{StaticResource SurfaceCard}" Padding="16" Margin="0,0,0,12">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button x:Name="OpenManual"
+                                   Click="OpenTheManual"
+                                   Appearance="Primary"
+                                   Padding="12,8"
+                                   Margin="0,0,10,0"
+                                   Content="Open the manual"
+                                   Icon="{ui:SymbolIcon BookOpen24}" />
+                        <ui:Button Click="OpenTheProject"
+                                   Appearance="Secondary"
+                                   Padding="12,8"
+                                   Margin="0,0,10,0"
+                                   Content="The project on GitHub"
+                                   Icon="{ui:SymbolIcon Link24}" />
+                        <ui:Button Click="ReportAProblem"
+                                   Appearance="Secondary"
+                                   Padding="12,8"
+                                   Content="Report a problem"
+                                   Icon="{ui:SymbolIcon Bug24}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource ContentSurface}" Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="The four tabs" Style="{StaticResource HelpHeading}" />
+                        <TextBlock Style="{StaticResource HelpRow}">
+                            <Run FontWeight="SemiBold">Backup</Run>
+                            <Run Text=" reads every PERSISTENT variable of the PLC into a json file. Read the report: a backup that says anything other than 0 failed, 0 skipped is missing exactly the variables it names." />
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource HelpRow}">
+                            <Run FontWeight="SemiBold">Restore</Run>
+                            <Run Text=" writes a file back. Variables on the PLC that the file does not mention are left alone and reported as skipped." />
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource HelpRow}">
+                            <Run FontWeight="SemiBold">Compare</Run>
+                            <Run Text=" puts two sides next to each other, each of them either the live PLC or a file. This is how a restore is checked: restore, read the plant back, compare." />
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource HelpRow}">
+                            <Run FontWeight="SemiBold">Explore</Run>
+                            <Run Text=" watches live values, writes single values, and plots them on the scope below." />
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource ContentSurface}" Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="A report saying success is not proof" Style="{StaticResource HelpHeading}" />
+                        <TextBlock Style="{StaticResource HelpRow}"
+                                   Text="The reason this fork exists is that a restore used to report every variable as written while silently losing everything nested inside a structure. If a restore matters, read the plant back and compare it against the file, with the PLC stopped. On a running machine the program changes values while you compare, and a value the restore failed to write cannot be told from one the program has moved since." />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource ContentSurface}" Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="The scope" Style="{StaticResource HelpHeading}" />
+                        <TextBlock Style="{StaticResource HelpRow}"
+                                   Text="Memory is how far back the recording is kept. Window is how much of it you see. Scrolling and zooming move the window inside the recording, which is what lets you stop and go back to something that has already passed." />
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition /><RowDefinition /><RowDefinition />
+                                <RowDefinition /><RowDefinition />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="wheel" Style="{StaticResource HelpKey}" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="zoom" Style="{StaticResource HelpRow}" />
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="shift + wheel" Style="{StaticResource HelpKey}" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="scroll back and forward" Style="{StaticResource HelpRow}" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Stop" Style="{StaticResource HelpKey}" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="freezes the view as well as the recording" Style="{StaticResource HelpRow}" />
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Arm" Style="{StaticResource HelpKey}" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="waits for the chosen crossing, keeps recording for half a window past it, then holds still with the event in the middle" Style="{StaticResource HelpRow}" />
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Sample ms" Style="{StaticResource HelpKey}" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="how often the PLC is asked to look. 200 ms unless you change it, so anything shorter than that is invisible. Timestamps are taken when the notification reaches this pc, so short events are ordered correctly but not measured." Style="{StaticResource HelpRow}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource ContentSurface}" Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="Command line" Style="{StaticResource HelpHeading}" />
+                        <TextBlock Style="{StaticResource HelpRow}"
+                                   Text="The same executable, without the window, so a backup can be a scheduled task or something the PLC starts itself with NT_StartProcess." />
+                        <TextBlock Style="{StaticResource HelpKey}" Margin="0,6,0,10">
+                            <Run Text="TwinCatAdsTool backup  &lt;netid&gt; &lt;port&gt; &lt;file&gt;" /><LineBreak />
+                            <Run Text="TwinCatAdsTool restore &lt;netid&gt; &lt;port&gt; &lt;file&gt;" /><LineBreak />
+                            <Run Text="TwinCatAdsTool compare &lt;netid&gt; &lt;port&gt; &lt;file&gt;" />
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource HelpRow}"
+                                   Text="The exit code carries the outcome: 0 done, 1 bad command line, 2 the PLC could not be reached, 3 finished but variables failed or were skipped, 4 unexpected, 5 compare found differences. 3 is the one that matters, because an incomplete backup still writes a file." />
+                        <TextBlock Style="{StaticResource HelpRow}"
+                                   Text="Run it through start /wait /b in a batch file, otherwise cmd carries on to the next line and errorlevel is read before the run has finished." />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource ContentSurface}" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="Where things are" Style="{StaticResource HelpHeading}" />
+                        <TextBlock Style="{StaticResource HelpRow}"
+                                   Text="The log goes to a logs folder beside the executable, or to %LOCALAPPDATA%\TwinCatAdsTool\logs when that cannot be written. It carries the reason behind every failed variable, and a breakdown of where a slow restore spent its time." />
+                        <TextBlock Style="{StaticResource HelpRow}"
+                                   Text="log.config beside the executable is optional. Without it the tool configures its own rolling log file." />
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -63,8 +63,8 @@ jobs:
       shell: pwsh
       run: |
         $v = '${{ steps.version.outputs.value }}'
-        Compress-Archive -Path out\framework-dependent\TwinCatAdsTool.exe, out\framework-dependent\log.config -DestinationPath "TwinCatAdsTool-$v-win-x64.zip"
-        Compress-Archive -Path out\self-contained\TwinCatAdsTool.exe, out\self-contained\log.config -DestinationPath "TwinCatAdsTool-$v-win-x64-selfcontained.zip"
+        Compress-Archive -Path out\framework-dependent\TwinCatAdsTool.exe, out\framework-dependent\log.config, out\framework-dependent\TwinCatAdsTool-Manual.pdf -DestinationPath "TwinCatAdsTool-$v-win-x64.zip"
+        Compress-Archive -Path out\self-contained\TwinCatAdsTool.exe, out\self-contained\log.config, out\self-contained\TwinCatAdsTool-Manual.pdf -DestinationPath "TwinCatAdsTool-$v-win-x64-selfcontained.zip"
 
     # The release notes are the annotation of the tag itself, so what is released, what it is
     # called and what it says it changed all come from one place. --generate-notes only produces

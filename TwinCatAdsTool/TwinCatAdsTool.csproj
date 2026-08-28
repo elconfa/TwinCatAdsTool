@@ -20,6 +20,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The help page opens this from beside the executable, and falls back to the copy on github
+         when it is not there. -->
+    <None Include="..\docs\TwinCatAdsTool-Manual.pdf" Link="TwinCatAdsTool-Manual.pdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="log.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <!-- Program.CreateLogger looks for this next to the executable. Copying it to the output
