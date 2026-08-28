@@ -69,9 +69,21 @@ jobs:
     # The release notes are the annotation of the tag itself, so what is released, what it is
     # called and what it says it changed all come from one place. --generate-notes only produces
     # a list of commit subjects, which is not what someone deciding whether to upgrade needs.
+    #
+    # The fetch and the check are not caution for its own sake. actions/checkout leaves the tag
+    # behind as a lightweight ref, and %(contents) of a lightweight tag is the message of the
+    # *commit* it points at - so the annotation was quietly replaced by the commit message, and
+    # 1.6.0 went out with a commit message as its release notes. Fetching brings the tag object
+    # itself across; the check refuses to publish rather than fall back a second time.
     - name: Release notes from the tag
       shell: pwsh
-      run: git tag -l --format='%(contents)' '${{ github.ref_name }}' | Out-File -Encoding utf8 release-notes.md
+      run: |
+        git fetch --force --tags origin
+        $kind = git cat-file -t 'refs/tags/${{ github.ref_name }}'
+        if ($kind -ne 'tag') {
+          throw "refs/tags/${{ github.ref_name }} is a $kind, not an annotated tag. The release notes are the tag annotation, so there would be nothing to publish but the commit message. Tag with 'git tag -a'."
+        }
+        git tag -l --format='%(contents)' '${{ github.ref_name }}' | Out-File -Encoding utf8 release-notes.md
 
     - name: Release
       shell: pwsh
