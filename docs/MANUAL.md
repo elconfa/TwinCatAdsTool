@@ -273,18 +273,25 @@ The left panel is the symbol tree. **Search** finds a symbol by any part of its 
 usually faster than opening the tree. The circular arrow re-reads the symbol list from the PLC, which
 you need after downloading a new program.
 
-The **+** next to a symbol adds it to the watch list on the right. Only leaves can be watched: a
-structure or an array has no single value to show.
+Every symbol in the tree, and every result of a search, carries a **+** on its right — the tooltip
+says *Watch this symbol*. Pressing it adds that symbol to the **watch list**, the table filling the
+top right of the tab. Nothing is watched until you press it, and the list is the only place a live
+value is ever shown.
 
-The watch list shows, for each symbol:
+Only leaves carry the **+**: a structure or an array has no single value to show, so open it and take
+the member you want.
+
+The watch list shows, for each symbol, from left to right:
 
 | Column | |
 |---|---|
+| **✕** | drop the symbol from the list, which also takes it off the plot |
 | Name | hover for the full path and the comment from the declaration |
-| Value | live, updated from the PLC |
 | Type | the PLC type as declared |
 | **P** | the variable is persistent, so it is one of those the Backup and Restore tabs act on |
-| New value | type a value here and press the send button to write it |
+| Value | live, updated from the PLC |
+| New value | type a value here and press the send button on its right to write it |
+| chart buttons | put the signal on the scope, or take it off — see below |
 
 The editor offered under *New value* follows the type: a switch for a `BOOL`, a number box for
 numeric types, a time picker for `TIME` and `DATE_AND_TIME`, a text box for strings.
@@ -295,8 +302,29 @@ numeric types, a time picker for `TIME` and `DATE_AND_TIME`, a text box for stri
 
 ## 8. The scope
 
-The lower half of the Explore tab plots the values you are watching. The chart button next to a
-symbol puts it on the plot; the minus takes it off.
+The lower half of the Explore tab is the plot. It is empty until you put something on it, and what
+you can put on it are the symbols already in the watch list.
+
+### Putting a variable on the scope
+
+It takes two steps, and the second one is the one people look for in the wrong place: the button
+that plots a signal is **not** in the symbol tree, it is at the far right of the row in the watch
+list.
+
+1. In the tree or in **Search**, press the **+** beside the symbol. It appears in the watch list.
+2. In its row in the watch list, scroll right to the last column and press the **chart** button
+   (tooltip *Add Graph*). The signal starts being drawn immediately.
+
+The **−** beside it (*Remove Graph*) takes it off the plot but leaves it in the watch list, still
+being read. The **✕** at the start of the row removes it from both.
+
+**If the row has no chart buttons at all, that type cannot be plotted.** They are shown only for
+numeric types and `BOOL`. A `STRING`, a `TIME` or a `DATE_AND_TIME` can be watched and written, but
+there is nothing to draw, so the buttons are absent rather than disabled — nothing is broken and no
+setting will bring them back.
+
+Repeat for as many signals as you want on the plot. `BOOL`s go into lanes of their own along the
+bottom, the rest share the band above, each with its own scale.
 
 ### Recording and viewing are two different spans
 
@@ -347,12 +375,38 @@ Two things this number does not promise:
 The question actually asked of a scope on a machine is not what the last ten minutes looked like, but
 what happened around the moment something changed.
 
-Pick a plotted signal and a condition, *goes TRUE*, *goes FALSE*, *rises above*, *falls below*, then
-**Arm**. When it fires, the recording carries on for **half a window** so the aftermath is captured
-too, and only then does everything hold still with the event in the middle, marked by a line.
+The trigger row sits above the plot, starting with the words **Trigger when**.
+
+**A variable can only be a trigger once it is on the plot.** The first dropdown lists the plotted
+signals and nothing else: while the plot is empty it is empty too, and there is no way to type a
+symbol name into it. So a variable that is only being watched cannot be armed on — put it on the
+plot first, with the two steps above, and it appears in the list straight away.
+
+Left to right along that row:
+
+| Control | |
+|---|---|
+| **Trigger when** ▾ | which of the plotted signals to wait on |
+| condition ▾ | *goes TRUE*, *goes FALSE*, *rises above*, *falls below* |
+| level | the number the last two are measured against; ignored by the first two |
+| **Arm** | start waiting |
+
+Press **Arm** and the button becomes **Disarm**, with **Waiting** beside it. When the condition
+fires, that text becomes **Triggered at 14:32:07.881**.
+
+You do not have to press **Start** first: arming restarts the recording and returns the view to the
+live edge on its own, because waiting for something to happen only makes sense from the present.
+
+When it fires, the recording carries on for **half a window** so the aftermath is captured too, and
+only then does everything hold still with the event in the middle, marked by a line.
+
+**Disarm** stops waiting. Taking the trigger signal off the plot also disarms, and clears the choice
+of signal — a trigger waiting on something no longer being drawn would wait for ever without saying
+why.
 
 Every condition is a crossing and never a state. A signal already TRUE when you arm has not just gone
-TRUE, so it will not fire; otherwise arming would fire instantly every time and catch nothing.
+TRUE, so it will not fire; otherwise arming would fire instantly every time and catch nothing. To
+catch a bit that is already up, wait for it to go FALSE, or arm before the machine gets there.
 
 ### CSV export
 
@@ -523,7 +577,13 @@ refuses a large one and the tool halves and retries. The retries are logged as w
 
 ### The scope shows nothing for a signal
 
-Only numeric and boolean types can be plotted. Strings and times are watchable but not plottable.
+Only numeric and boolean types can be plotted. Strings and times are watchable but not plottable, and
+their rows in the watch list have no chart buttons at all rather than greyed out ones.
+
+### The trigger dropdown is empty, or does not list the variable I want
+
+It lists the signals **on the plot**, not the ones in the watch list. Put the variable on the plot
+first: the chart button at the right of its row in the watch list.
 
 ### A watch set will not load some symbols
 

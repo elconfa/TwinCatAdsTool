@@ -104,7 +104,20 @@
 
                 <Border Style="{StaticResource ContentSurface}" Padding="16" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Text="The scope" Style="{StaticResource HelpHeading}" />
+                        <TextBlock Text="Getting a signal onto the scope" Style="{StaticResource HelpHeading}" />
+                        <TextBlock Style="{StaticResource HelpRow}">
+                            <Run Text="Two steps, and the second button is not where most people look for it." /><LineBreak />
+                            <Run Text="1. In the tree or in Search, press the " /><Run FontWeight="SemiBold" Text="+" /><Run Text=" beside the symbol. It joins the watch list on the right." /><LineBreak />
+                            <Run Text="2. In its row in the watch list, at the far right, press the " /><Run FontWeight="SemiBold" Text="chart" /><Run Text=" button. That is what draws it. The minus beside it takes it off the plot but keeps it watched." />
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource HelpRow}"
+                                   Text="No chart buttons on the row means that type cannot be plotted: only numbers and BOOL can. Strings and times are watchable but not drawable, so the buttons are absent rather than disabled." />
+
+                        <TextBlock Text="Using it as a trigger" Style="{StaticResource HelpHeading}" Margin="0,14,0,0" />
+                        <TextBlock Style="{StaticResource HelpRow}"
+                                   Text="The Trigger when dropdown lists the signals already on the plot and nothing else, so put the variable on the plot first. Then pick the condition, set the level if it is rises above or falls below, and press Arm. Arm restarts the recording and returns to the live edge by itself. Waiting appears beside the button until it fires, then Triggered at, with the time. When it fires the recording carries on for half a window, so what followed is captured too, and only then does everything hold still with the event in the middle. Every condition is a crossing and never a state: a bit already TRUE when you arm has not just gone TRUE and will not fire. Taking a signal off the plot disarms the trigger waiting on it." />
+
+                        <TextBlock Text="The scope" Style="{StaticResource HelpHeading}" Margin="0,14,0,0" />
                         <TextBlock Style="{StaticResource HelpRow}"
                                    Text="Memory is how far back the recording is kept. Window is how much of it you see. Scrolling and zooming move the window inside the recording, which is what lets you stop and go back to something that has already passed." />
                         <Grid Margin="0,8,0,0">
@@ -113,7 +126,7 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
-                                <RowDefinition /><RowDefinition /><RowDefinition />
+                                <RowDefinition /><RowDefinition />
                                 <RowDefinition /><RowDefinition />
                             </Grid.RowDefinitions>
 
@@ -123,10 +136,8 @@
                             <TextBlock Grid.Row="1" Grid.Column="1" Text="scroll back and forward" Style="{StaticResource HelpRow}" />
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Stop" Style="{StaticResource HelpKey}" />
                             <TextBlock Grid.Row="2" Grid.Column="1" Text="freezes the view as well as the recording" Style="{StaticResource HelpRow}" />
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Arm" Style="{StaticResource HelpKey}" />
-                            <TextBlock Grid.Row="3" Grid.Column="1" Text="waits for the chosen crossing, keeps recording for half a window past it, then holds still with the event in the middle" Style="{StaticResource HelpRow}" />
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Sample ms" Style="{StaticResource HelpKey}" />
-                            <TextBlock Grid.Row="4" Grid.Column="1" Text="how often the PLC is asked to look. 200 ms unless you change it, so anything shorter than that is invisible. Timestamps are taken when the notification reaches this pc, so short events are ordered correctly but not measured." Style="{StaticResource HelpRow}" />
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Sample ms" Style="{StaticResource HelpKey}" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="how often the PLC is asked to look. 200 ms unless you change it, so anything shorter than that is invisible. Timestamps are taken when the notification reaches this pc, so short events are ordered correctly but not measured." Style="{StaticResource HelpRow}" />
                         </Grid>
                     </StackPanel>
                 </Border>
