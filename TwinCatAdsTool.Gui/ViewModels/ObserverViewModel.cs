@@ -44,6 +44,9 @@ namespace TwinCatAdsTool.Gui.ViewModels
                     case "BOOL":
                         ViewModels.Add(viewModelFactory.CreateViewModel<ISymbol, SymbolObservationViewModel<bool>>(symbol));
                         break;
+                    case "BIT":
+                        ViewModels.Add(viewModelFactory.CreateViewModel<ISymbol, SymbolObservationBitViewModel>(symbol));
+                        break;
                     case "BYTE":
                         ViewModels.Add(viewModelFactory.CreateViewModel<ISymbol, SymbolObservationViewModel<byte>>(symbol));
                         break;
@@ -93,6 +96,15 @@ namespace TwinCatAdsTool.Gui.ViewModels
                         if (symbol.TypeName.ToUpper().StartsWith("STRING"))
                         {
                             ViewModels.Add(viewModelFactory.CreateViewModel<ISymbol, SymbolObservationViewModel<string>>(symbol));
+                            break;
+                        }
+
+                        // A bit does not always arrive under the name BIT: an alias, or another
+                        // server, can call it something else. What it cannot hide is that it is
+                        // narrower than a byte, and that is enough to treat it as the case above.
+                        if (symbol.IsBitType && symbol.BitSize == 1)
+                        {
+                            ViewModels.Add(viewModelFactory.CreateViewModel<ISymbol, SymbolObservationBitViewModel>(symbol));
                             break;
                         }
 

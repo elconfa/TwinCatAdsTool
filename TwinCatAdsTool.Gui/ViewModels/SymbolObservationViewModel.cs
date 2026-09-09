@@ -235,4 +235,51 @@ namespace TwinCatAdsTool.Gui.ViewModels
             }
         }
     }
+
+    /// <summary>
+    /// A single BIT. It is read and drawn like a BOOL, but it does not own the byte it sits in:
+    /// up to seven other bits of the same struct share that byte. Writing it through a variable
+    /// handle would send a whole byte and clear the neighbours, so the write is handed to the
+    /// symbol, which knows the bit offset and leaves the rest of the byte as it is.
+    /// </summary>
+    public class SymbolObservationBitViewModel : SymbolObservationViewModel<bool>
+    {
+        public SymbolObservationBitViewModel(ISymbol model, IClientService clientService) : base(model, clientService)
+        {
+        }
+
+        public override void Init()
+        {
+            try
+            {
+                base.Init();
+            }
+            catch (InvalidCastException e)
+            {
+                // The plc is expected to report a bit as a bool, and every write path below assumes
+                // it does. If some server reports it as something else, the value is still watched
+                // and still plotted; only the editor under New value starts empty.
+                Logger.Error($"{FullName} does not read back as a bool, so it cannot be written from here.", e);
+            }
+        }
+
+        protected override Task SubmitSymbol()
+        {
+            if (Model.IsReadOnly)
+            {
+                MessageBox.Show(Resources.ThisValueIsReadOnly, Resources.ReadOnlyValue, MessageBoxButton.OK);
+                return Task.FromResult(RxVoid.Default);
+            }
+
+            if (!(Model is IValueSymbol valueSymbol))
+            {
+                Logger.Error($"{FullName} carries no value that can be written.");
+                return Task.FromResult(RxVoid.Default);
+            }
+
+            Logger.Debug(string.Format(Resources.TryingToWriteTo0WithValue1, Model.InstancePath, NewValue));
+            valueSymbol.WriteValue(NewValue);
+            return Task.FromResult(RxVoid.Default);
+        }
+    }
 }

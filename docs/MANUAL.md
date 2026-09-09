@@ -293,8 +293,8 @@ The watch list shows, for each symbol, from left to right:
 | New value | type a value here and press the send button on its right to write it |
 | chart buttons | put the signal on the scope, or take it off — see below |
 
-The editor offered under *New value* follows the type: a switch for a `BOOL`, a number box for
-numeric types, a time picker for `TIME` and `DATE_AND_TIME`, a text box for strings.
+The editor offered under *New value* follows the type: a switch for a `BOOL` or a `BIT`, a number
+box for numeric types, a time picker for `TIME` and `DATE_AND_TIME`, a text box for strings.
 
 **Writing a value here writes it to the running machine immediately.** There is no confirmation.
 
@@ -319,12 +319,17 @@ The **−** beside it (*Remove Graph*) takes it off the plot but leaves it in th
 being read. The **✕** at the start of the row removes it from both.
 
 **If the row has no chart buttons at all, that type cannot be plotted.** They are shown only for
-numeric types and `BOOL`. A `STRING`, a `TIME` or a `DATE_AND_TIME` can be watched and written, but
-there is nothing to draw, so the buttons are absent rather than disabled — nothing is broken and no
-setting will bring them back.
+numeric types, `BOOL` and `BIT`. A `STRING`, a `TIME` or a `DATE_AND_TIME` can be watched and
+written, but there is nothing to draw, so the buttons are absent rather than disabled — nothing is
+broken and no setting will bring them back.
 
-Repeat for as many signals as you want on the plot. `BOOL`s go into lanes of their own along the
-bottom, the rest share the band above, each with its own scale.
+A `BIT` — the one-bit type a packed `STRUCT` or `UNION` is built from — is watched, plotted and
+triggered on exactly like a `BOOL`. Writing one is safe as well: it does not own the byte it sits
+in, so the value is written through the symbol, which sets that bit and leaves the other seven
+alone.
+
+Repeat for as many signals as you want on the plot. `BOOL`s and `BIT`s go into lanes of their own
+along the bottom, the rest share the band above, each with its own scale.
 
 ### Recording and viewing are two different spans
 
@@ -353,9 +358,9 @@ The **mouse wheel zooms**, and **shift with the wheel scrolls**.
 
 ### Digital signals
 
-A `BOOL` gets a lane of its own along the bottom and is drawn as steps. Analogue signals share the
-band above, each with its own scale. A bit does not travel through the values between 0 and 1, so
-drawing a transition as a slope would be a lie about the machine.
+A `BOOL` or a `BIT` gets a lane of its own along the bottom and is drawn as steps. Analogue signals
+share the band above, each with its own scale. A bit does not travel through the values between 0
+and 1, so drawing a transition as a slope would be a lie about the machine.
 
 ### Sample ms
 

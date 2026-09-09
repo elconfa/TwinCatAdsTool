@@ -111,7 +111,7 @@
                             <Run Text="2. In its row in the watch list, at the far right, press the " /><Run FontWeight="SemiBold" Text="chart" /><Run Text=" button. That is what draws it. The minus beside it takes it off the plot but keeps it watched." />
                         </TextBlock>
                         <TextBlock Style="{StaticResource HelpRow}"
-                                   Text="No chart buttons on the row means that type cannot be plotted: only numbers and BOOL can. Strings and times are watchable but not drawable, so the buttons are absent rather than disabled." />
+                                   Text="No chart buttons on the row means that type cannot be plotted: only numbers, BOOL and BIT can. A BIT, the one bit type a packed STRUCT or UNION is made of, behaves like a BOOL here: same lane, same trigger, and writing one sets that bit without disturbing the other seven in its byte. Strings and times are watchable but not drawable, so the buttons are absent rather than disabled." />
 
                         <TextBlock Text="Using it as a trigger" Style="{StaticResource HelpHeading}" Margin="0,14,0,0" />
                         <TextBlock Style="{StaticResource HelpRow}"

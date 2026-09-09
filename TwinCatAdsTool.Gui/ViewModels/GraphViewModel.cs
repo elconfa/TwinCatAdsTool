@@ -654,7 +654,11 @@ namespace TwinCatAdsTool.Gui.ViewModels
 
         private static bool IsDigital(SymbolObservationViewModel symbol)
         {
-            return string.Equals(symbol.Model?.TypeName, "BOOL", StringComparison.OrdinalIgnoreCase);
+            // A bit carries the same two states as a BOOL and belongs in the same lane; left out of
+            // here it would be drawn as 0 and 1 against the analogue scale, which is unreadable. It
+            // is recognised by its width rather than by its name, the way the watch list does it.
+            return string.Equals(symbol.Model?.TypeName, "BOOL", StringComparison.OrdinalIgnoreCase)
+                   || (symbol.Model != null && symbol.Model.IsBitType && symbol.Model.BitSize == 1);
         }
 
         private static bool TryReadAsNumber(object value, out double number)
